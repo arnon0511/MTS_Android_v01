@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MTS" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/mts_navy</item>
+        <item name="colorPrimaryVariant">@color/mts_navy</item>
+        <item name="colorSecondary">@color/mts_green</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/mts_navy</item>
+        <item name="android:windowBackground">@color/mts_background</item>
+    </style>
+</resources>
