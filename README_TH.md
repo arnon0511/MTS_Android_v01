@@ -1,4 +1,8 @@
-# MTS Android v0.3.0 — Production Control
+# MTS Android v0.3.1 — Production Control
+
+## แก้ไข v0.3.1
+
+- ตัดการสืบทอด `Summary extends Totals` เพื่อแก้ Compile Error อย่างถาวร
 
 ## เพิ่มใหม่ v0.3.0
 
@@ -68,7 +72,7 @@
 1. สร้าง GitHub repository ใหม่
 2. Upload ทุกไฟล์ในโฟลเดอร์นี้ โดยต้องเห็น `app`, `.github`, `build.gradle`, `settings.gradle`
 3. เปิดแท็บ Actions → `Build MTS Android APK` → Run workflow
-4. เมื่องานเสร็จ เปิด Run → Artifacts → ดาวน์โหลด `MTS-Android-v0.3.0-production-control`
+4. เมื่องานเสร็จ เปิด Run → Artifacts → ดาวน์โหลด `MTS-Android-v0.3.1-production-control`
 5. แตก ZIP แล้วส่ง `app-debug.apk` เข้า Galaxy S25 Ultra
 
 ## ขอบเขตที่ยังไม่รวมใน v0.3.0

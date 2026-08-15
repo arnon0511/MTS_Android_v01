@@ -22,9 +22,9 @@ public final class ProductionStore extends SQLiteOpenHelper {
         public String item, lot, process;
     }
     public static final class Totals { public long ok,ng,workingSec,stopSec; }
-    public static final class Summary extends Totals {
+    public static final class Summary {
         public String shiftId="",shift="",employee="",machine="";
-        public long startMs,closeMs;
+        public long startMs,closeMs,ok,ng,workingSec,stopSec;
     }
 
     private final SharedPreferences prefs;

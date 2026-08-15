@@ -74,7 +74,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartShift() {
-        makeScreen("MTS Android v0.3.0");
+        makeScreen("MTS Android v0.3.1");
         label("MANUFACTURING TRACEABILITY",26,NAVY,true);
         label("Offline Test Build • Galaxy S25 Ultra",15,Color.DKGRAY,false);
         gap(20);
