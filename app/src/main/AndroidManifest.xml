@@ -6,6 +6,10 @@
         android:label="MTS Android"
         android:theme="@style/Theme.MTS">
         <activity
+            android:name=".LogicTestActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
             android:exported="true">

@@ -1,13 +1,17 @@
 package com.tskforging.mtsandroid;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -31,13 +35,19 @@ import java.util.Locale;
 
 public final class MainActivity extends AppCompatActivity {
     private enum ScanTarget { EMPLOYEE, MACHINE, TAG }
-    private final int NAVY=Color.rgb(23,50,77), BLUE=Color.rgb(31,78,120), GREEN=Color.rgb(46,125,50);
+    private final int NAVY=Color.rgb(15,43,70), BLUE=Color.rgb(0,82,155), GREEN=Color.rgb(0,112,60);
+    private final int RED=Color.rgb(190,25,35), WHITE=Color.WHITE, PALE=Color.rgb(245,248,252);
     private LinearLayout body;
     private MtsDb db;
+    private ProductionStore production;
     private ScanTarget scanTarget;
     private String employee="", machine="", shift="DAY", shiftId="";
     private long shiftStart=0;
     private TagParser.ResultTag pendingTag;
+    private TextView timerText;
+    private boolean productionScreen=false;
+    private final Handler timerHandler=new Handler(Looper.getMainLooper());
+    private final Runnable timerTick=new Runnable(){@Override public void run(){if(productionScreen){updateTimer();timerHandler.postDelayed(this,1000);}}};
 
     private final ActivityResultLauncher<ScanOptions> scanner = registerForActivityResult(
             new ScanContract(), this::onScanResult);
@@ -45,12 +55,16 @@ public final class MainActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         db=new MtsDb(this);
-        showStartShift();
+        production=new ProductionStore(this);
+        if(production.hasActiveShift()){
+            employee=production.employee();machine=production.machine();shift=production.shiftName();shiftId=production.shiftId();shiftStart=production.startMs();showProductionAuto();
+        }else showStartShift();
     }
 
     private void makeScreen(String title) {
+        productionScreen=false;timerHandler.removeCallbacks(timerTick);
         LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(245,247,250));
+        root.setBackgroundColor(PALE);
         TextView header=new TextView(this); header.setText(title); header.setTextColor(Color.WHITE);
         header.setTextSize(22); header.setGravity(Gravity.CENTER_VERTICAL); header.setPadding(dp(20),0,dp(16),0);
         header.setBackgroundColor(NAVY); root.addView(header,new LinearLayout.LayoutParams(-1,dp(64)));
@@ -60,7 +74,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartShift() {
-        makeScreen("MTS Android v0.1");
+        makeScreen("MTS Android v0.3.0");
         label("MANUFACTURING TRACEABILITY",26,NAVY,true);
         label("Offline Test Build • Galaxy S25 Ultra",15,Color.DKGRAY,false);
         gap(20);
@@ -77,25 +91,32 @@ public final class MainActivity extends AppCompatActivity {
         action("CONFIRM START SHIFT",GREEN,v->{
             shift=(String)spinner.getSelectedItem();
             if(employee.isEmpty()||machine.isEmpty()){toast("Scan Employee and Machine first");return;}
-            shiftStart=System.currentTimeMillis(); shiftId=new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date(shiftStart));
+            shiftStart=System.currentTimeMillis();production.startShift(shift,employee,machine,shiftStart);shiftId=production.shiftId();
             showProductionAuto();
         });
-        gap(10); outline("TAG HISTORY",v->showHistory());
+        gap(10); outline("LOGIC TEST MODE",v->startActivity(new Intent(this,LogicTestActivity.class)));
+        outline("TAG HISTORY",v->showHistory());
+        ProductionStore.Summary last=production.lastSummary();
+        if(!last.shiftId.isEmpty())outline("LAST MACHINE SHIFT SUMMARY",v->showSummary(last,true));
     }
 
     private void showProductionAuto() {
         makeScreen("PRODUCTION AUTO");
+        productionScreen=true;
         statusCard("Shift",shift+"  •  "+fmt(shiftStart));
         statusCard("Employee / Machine",employee+"  /  "+machine);
+        timerText=new TextView(this);timerText.setTextSize(18);timerText.setTextColor(NAVY);timerText.setTypeface(null,1);timerText.setPadding(dp(16),dp(13),dp(16),dp(13));timerText.setBackgroundColor(WHITE);
+        LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,-2);tlp.setMargins(0,dp(6),0,dp(6));body.addView(timerText,tlp);updateTimer();timerHandler.postDelayed(timerTick,1000);
         gap(12);
         action("SCAN PRODUCTION TAG",BLUE,v->scan(ScanTarget.TAG,"Scan WIP or FG Result Tag"));
-        gap(8); outline("TAG HISTORY",v->showHistory());
-        outline("EXPORT CSV",v->exportCsv());
-        gap(28); danger("CLOSE SHIFT",v->new AlertDialog.Builder(this).setTitle("Close Shift?")
-                .setMessage("v0.1 will close the current test shift. Tag History remains saved.")
-                .setNegativeButton("CANCEL",null).setPositiveButton("CLOSE",(d,w)->{
-                    employee="";machine="";shiftId="";shiftStart=0;showStartShift();
-                }).show());
+        action("ADD NG",Color.rgb(198,94,0),v->showAddNg());
+        if(production.stopRunning())danger("END STOP — "+production.stopReason(),v->{production.endStop(System.currentTimeMillis());toast("Stop Time saved");showProductionAuto();});
+        else action("STOP M/C",Color.rgb(198,94,0),v->showStartStop());
+        gap(8);outline("MACHINE SHIFT SUMMARY",v->showSummary(production.summary(shiftId),false));
+        outline("TOOL LIFE",v->showToolLife());
+        outline("TAG HISTORY",v->showHistory());
+        outline("EXPORT TAG HISTORY CSV",v->exportCsv());
+        gap(22);danger("CLOSE SHIFT",v->showCloseShift());
     }
 
     private void onScanResult(ScanIntentResult result) {
@@ -118,13 +139,18 @@ public final class MainActivity extends AppCompatActivity {
         statusCard("Item No.",pendingTag.item);
         statusCard("Part No.",pendingTag.partNo);
         statusCard("Part Name",pendingTag.partName);
-        statusCard("Lot / Qty",pendingTag.lot+"  /  "+pendingTag.qty);
+        long tagQty=production.parsedTagQty(pendingTag.qty),previous=production.previousForItem(pendingTag.item),thisQty=Math.max(0,tagQty-previous);
+        statusCard("Lot No.",pendingTag.lot);
+        statusCard("Tag Qty (Original)",String.valueOf(tagQty));
+        statusCard("Previous Shift Qty",String.valueOf(previous));
+        statusCard("This Shift Qty OK",String.valueOf(thisQty));
         statusCard("Charge No.",pendingTag.charge);
         gap(12);
         action("CONFIRM",GREEN,v->{
-            long id=db.confirm(shiftId,shift,employee,machine,pendingTag,System.currentTimeMillis());
+            long now=System.currentTimeMillis();ProductionStore.QtyResult qty=production.confirmTag(pendingTag,now);
+            long id=db.confirm(shiftId,shift,employee,machine,pendingTag,now);
             if(id<0){showError("SAVE ERROR","Tag was not recorded. It may already exist.");}
-            else{pendingTag=null;toast("Confirmed and saved to Tag History");showProductionAuto();}
+            else{pendingTag=null;toast("Confirmed • This Shift OK = "+qty.thisShiftQty);showProductionAuto();}
         });
         outline("CANCEL — DO NOT SAVE",v->{pendingTag=null;showProductionAuto();});
     }
@@ -157,6 +183,79 @@ public final class MainActivity extends AppCompatActivity {
         }catch(Exception e){showError("EXPORT ERROR",e.getMessage()==null?e.toString():e.getMessage());}
     }
 
+    private void updateTimer(){
+        if(timerText==null)return;ProductionStore.Totals t=production.totals();
+        String state=production.stopRunning()?"STOP RUNNING: "+production.stopReason():"WORKING";
+        timerText.setText(state+"\nOK: "+t.ok+"   NG: "+t.ng+"\nWorking: "+duration(t.workingSec)+"   Stop: "+duration(t.stopSec));
+        timerText.setTextColor(production.stopRunning()?RED:GREEN);
+    }
+
+    private void showAddNg(){
+        if(production.activeItem().isEmpty()){toast("Scan and Confirm a Production Tag first");return;}
+        LinearLayout form=dialogForm();EditText qty=numberInput("NG Qty");Spinner reason=spinner(ProductionStore.NG_REASONS);
+        form.addView(qty);form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
+        new AlertDialog.Builder(this).setTitle("ADD NG — "+production.activeItem()+" / "+production.activeLot()).setView(form)
+                .setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM",(d,w)->{
+                    try{production.addNg(longValue(qty),String.valueOf(reason.getSelectedItem()),System.currentTimeMillis());toast("NG saved");showProductionAuto();}
+                    catch(Exception e){toast(e.getMessage()==null?"Cannot save NG":e.getMessage());}
+                }).show();
+    }
+
+    private void showStartStop(){
+        Spinner reason=spinner(ProductionStore.STOP_REASONS);LinearLayout form=dialogForm();form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
+        new AlertDialog.Builder(this).setTitle("STOP M/C REASON").setView(form).setNegativeButton("CANCEL",null)
+                .setPositiveButton("START TIMER",(d,w)->{production.startStop(String.valueOf(reason.getSelectedItem()),System.currentTimeMillis());showProductionAuto();}).show();
+    }
+
+    private void showCloseShift(){
+        LinearLayout form=dialogForm();TextView active=new TextView(this);active.setText("Last Item: "+emptyDash(production.activeItem())+"\nLast Lot: "+emptyDash(production.activeLot()));active.setTextSize(16);active.setTextColor(NAVY);active.setPadding(0,0,0,dp(8));
+        EditText ok=numberInput("Last Lot OK (0 if none)"),ng=numberInput("Last Lot NG (0 if none)");Spinner ngReason=spinner(ProductionStore.NG_REASONS);
+        form.addView(active);form.addView(ok);form.addView(ng);form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("CLOSE SHIFT").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM CLOSE",null).create();
+        dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                long lastOk=longValue(ok),lastNg=longValue(ng);ProductionStore.Summary s=production.closeShift(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",System.currentTimeMillis());
+                dialog.dismiss();exportShift(s.shiftId,false);shiftStart=0;shiftId="";showSummary(s,true);
+            }catch(Exception e){toast(e.getMessage()==null?"Cannot close shift":e.getMessage());}
+        }));dialog.show();
+    }
+
+    private void showSummary(ProductionStore.Summary s,boolean closed){
+        makeScreen(closed?"MACHINE SHIFT SUMMARY — CLOSED":"MACHINE SHIFT SUMMARY");
+        label(s.machine+" • "+s.shift,20,NAVY,true);label(fmt(s.startMs)+" → "+fmt(s.closeMs),14,Color.DKGRAY,false);gap(10);
+        summaryCard("OK",s.ok,GREEN);summaryCard("NG",s.ng,RED);summaryCard("WORKING TIME",duration(s.workingSec),BLUE);summaryCard("STOP TIME",duration(s.stopSec),Color.rgb(198,94,0));
+        gap(8);outline("EXPORT SHIFT REPORT",v->exportShift(s.shiftId,true));
+        if(closed)action("START NEXT SHIFT",GREEN,v->{employee="";machine="";shift="DAY";showStartShift();});
+        else outline("BACK TO PRODUCTION",v->showProductionAuto());
+    }
+
+    private void showToolLife(){
+        makeScreen("TOOL LIFE");label("CURRENT TOOL",18,NAVY,true);statusCard("Code / Type",production.toolCode()+" / "+production.toolType());summaryCard("LIFE QTY",production.toolLife(),GREEN);
+        action("INSTALL / CHANGE TOOL",BLUE,v->showInstallTool());outline("BACK TO PRODUCTION",v->showProductionAuto());
+    }
+
+    private void showInstallTool(){
+        LinearLayout form=dialogForm();EditText code=textInput("Tool Code");Spinner type=spinner(new String[]{"SAW","CHIP","DIE"});form.addView(code);form.addView(type,new LinearLayout.LayoutParams(-1,dp(56)));
+        new AlertDialog.Builder(this).setTitle("INSTALL NEW TOOL").setMessage("New Tool Life will reset to 0.").setView(form).setNegativeButton("CANCEL",null)
+                .setPositiveButton("INSTALL",(d,w)->{if(code.getText().toString().trim().isEmpty()){toast("Tool Code is required");return;}production.installTool(code.getText().toString(),String.valueOf(type.getSelectedItem()));showToolLife();}).show();
+    }
+
+    private void exportShift(String id,boolean share){
+        try{Uri uri=CsvExporter.exportShiftReport(this,id,production.reportRows(id));toast("Shift Report saved in Downloads/MTS_Exports");
+            if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/csv");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share MTS Shift Report"));}
+        }catch(Exception e){toast(e.getMessage()==null?"Export failed":e.getMessage());}
+    }
+
+    private LinearLayout dialogForm(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(22),dp(8),dp(22),0);return l;}
+    private EditText numberInput(String hint){EditText e=new EditText(this);e.setHint(hint);e.setText("0");e.setTextSize(18);e.setTextColor(NAVY);e.setInputType(InputType.TYPE_CLASS_NUMBER);e.setSelectAllOnFocus(true);e.setMinHeight(dp(56));return e;}
+    private EditText textInput(String hint){EditText e=new EditText(this);e.setHint(hint);e.setTextSize(18);e.setTextColor(NAVY);e.setInputType(InputType.TYPE_CLASS_TEXT);e.setMinHeight(dp(56));return e;}
+    private Spinner spinner(String[] values){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,values));return s;}
+    private long longValue(EditText e){try{return Long.parseLong(e.getText().toString().trim());}catch(Exception x){return 0;}}
+    private void summaryCard(String title,long value,int color){summaryCard(title,String.valueOf(value),color);}
+    private void summaryCard(String title,String value,int color){TextView t=new TextView(this);t.setText(title+"\n"+value);t.setTextSize(25);t.setTextColor(color);t.setTypeface(null,1);t.setGravity(Gravity.CENTER);t.setPadding(dp(12),dp(14),dp(12),dp(14));t.setBackgroundColor(WHITE);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(5),0,dp(5));body.addView(t,lp);}
+    private String duration(long sec){long h=sec/3600,m=(sec%3600)/60,s=sec%60;return String.format(Locale.US,"%02d:%02d:%02d",h,m,s);}
+    private String emptyDash(String s){return s==null||s.isEmpty()?"-":s;}
+
     private void scan(ScanTarget target,String prompt){
         scanTarget=target;ScanOptions options=new ScanOptions();options.setPrompt(prompt);options.setBeepEnabled(true);
         options.setOrientationLocked(false);options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);scanner.launch(options);
@@ -170,15 +269,27 @@ public final class MainActivity extends AppCompatActivity {
             .setNegativeButton("CANCEL",(d,w)->showProductionAuto()).show();}
     private void statusCard(String title,String value){
         TextView t=new TextView(this);t.setText(title+"\n"+value);t.setTextSize(17);t.setTextColor(NAVY);t.setPadding(dp(16),dp(12),dp(16),dp(12));
-        t.setBackgroundColor(Color.WHITE);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(6));body.addView(t,lp);
+        t.setBackgroundColor(WHITE);t.setTypeface(null,1);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(6));body.addView(t,lp);
     }
     private void label(String text,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(text);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(null,1);body.addView(t);}
-    private void action(String text,int color,View.OnClickListener click){MaterialButton b=new MaterialButton(this);b.setText(text);b.setTextSize(17);b.setTextColor(Color.WHITE);b.setBackgroundColor(color);b.setOnClickListener(click);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(58));lp.setMargins(0,dp(7),0,dp(7));body.addView(b,lp);}
-    private void outline(String text,View.OnClickListener click){Button b=new Button(this);b.setText(text);b.setTextSize(16);b.setTextColor(BLUE);b.setOnClickListener(click);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(54));lp.setMargins(0,dp(6),0,dp(6));body.addView(b,lp);}
-    private void danger(String text,View.OnClickListener click){action(text,Color.rgb(198,40,40),click);}
+    private void action(String text,int color,View.OnClickListener click){
+        MaterialButton b=new MaterialButton(this);b.setText(text);b.setTextSize(17);b.setTextColor(WHITE);
+        b.setTypeface(null,1);b.setAllCaps(false);b.setBackgroundTintList(ColorStateList.valueOf(color));
+        b.setRippleColor(ColorStateList.valueOf(Color.argb(60,255,255,255)));b.setOnClickListener(click);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(60));lp.setMargins(0,dp(7),0,dp(7));body.addView(b,lp);
+    }
+    private void outline(String text,View.OnClickListener click){
+        MaterialButton b=new MaterialButton(this);b.setText(text);b.setTextSize(16);b.setTextColor(NAVY);
+        b.setTypeface(null,1);b.setAllCaps(false);b.setBackgroundTintList(ColorStateList.valueOf(WHITE));
+        b.setStrokeColor(ColorStateList.valueOf(BLUE));b.setStrokeWidth(dp(2));b.setOnClickListener(click);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(56));lp.setMargins(0,dp(6),0,dp(6));body.addView(b,lp);
+    }
+    private void danger(String text,View.OnClickListener click){action(text,RED,click);}
     private void gap(int px){View v=new View(this);body.addView(v,new LinearLayout.LayoutParams(1,dp(px)));}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
     private String fmt(long ms){return ms<=0?"-":new SimpleDateFormat("dd/MM/yyyy HH:mm:ss",Locale.US).format(new Date(ms));}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
-    @Override public void onBackPressed(){if(shiftStart>0)showProductionAuto();else super.onBackPressed();}
+    @Override protected void onResume(){super.onResume();if(productionScreen){timerHandler.removeCallbacks(timerTick);timerHandler.post(timerTick);}}
+    @Override protected void onPause(){timerHandler.removeCallbacks(timerTick);super.onPause();}
+    @Override public void onBackPressed(){if(production.hasActiveShift())showProductionAuto();else super.onBackPressed();}
 }
