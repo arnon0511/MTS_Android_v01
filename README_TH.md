@@ -1,50 +1,90 @@
-# MTS Android v1.0.0 — Full Test
+# Check Tag_RS Android v0.11
 
-รุ่นทดสอบรวมระบบ Manufacturing Traceability สำหรับ Galaxy S25 Ultra ใช้งาน Offline และเก็บข้อมูลในเครื่อง
+แอปสำหรับ Point Mobile PM75 (Android 11) ใช้ตรวจ Tag และบันทึกหลักฐานลง SQLite ในเครื่องก่อนเสมอ
 
-## ฟังก์ชันหลัก
+## สิ่งที่ทำงานแล้ว
 
-- Start Shift ด้วย Employee และ Machine QR
-- Management ตั้งเวลา DAY/NIGHT, ช่วงยอมรับ Start/Close, Break และ Reasons ได้โดยไม่แก้ Firmware
-- Start นอกช่วงเวลาที่กำหนดต้องเลือก Reason; Start ในช่วงกำหนดปรับเป็นเวลามาตรฐาน
-- Production Auto แสดง OK, NG, Working Time และ Stop Time แบบ Real Time
-- Timer และสถานะ Shift/Stop กลับมาทำงานต่อหลังเปิดแอปใหม่
-- Scan WIP/FG Tag และตรวจ Duplicate ด้วย `Process + Item + Lot`
-- Tag Item/Lot เดิมแต่ Process ต่างกันไม่ถือว่าซ้ำ
-- Carryover: `This Shift Qty = Original Tag Qty - Previous Shift Qty` โดยหน้า Confirm/History ยังคงแสดงข้อมูลดิบ
-- Add NG ทุก Item พร้อม Reason
-- Stop M/C พร้อม Reason และ END STOP
-- Close Shift ใส่ Last Lot OK/NG พร้อม NG Reason
-- Close Shift ก่อนมาตรฐานเกินช่วงกำหนดต้องเลือก Reason
-- บังคับตอบ Coffee Break, Meal Break และ OT Break ก่อนปิดกะ
-- Machine Shift Summary แสดง OK, NG, Working, Stop, OT และ Break
-- Tool Life สะสมจากยอด OK และ Reset เมื่อ Install Tool
-- Tag History เฉพาะรายการ Confirm, ดู RAW QR, Export CSV และ Clear History พร้อม Confirm
-- Auto Export Excel `.xlsx` เมื่อ Close Shift
-- Excel มี 3 Sheet: Shift Summary, Tag History และ Events
+- รับข้อมูล Scanner แบบ Keyboard Wedge และ Enter suffix
+- บังคับสแกน QR พนักงานก่อนเริ่มตรวจทุกหนึ่งรายการ รูปแบบ `EMPLOYEE|ชื่อ`
+- เมื่อ KANBAN จับคู่ครบทุก BOX ระบบบันทึกผลและรอ QR พนักงานรอบใหม่ทันที โดยไม่ต้องกด NEW SCAN
+- บันทึกชื่อผู้ตรวจและ QR พนักงานดิบไว้กับผลตรวจทุกครั้ง
+- แยก Stand/Plastic Tag รูปแบบ `|PART-NO`
+- แยก FG Tag จาก Field 4 โดยคง Part No. แบบเต็ม
+- แยก Kanban Aisin: `01213161-17170` → `1213161-17170`
+- แยก Kanban DNTH: รองรับ `TGY94159-0010` และ `TG028351-5130` พร้อมตรวจว่าค่าที่พิมพ์ซ้ำตรงกัน
+- แยก Kanban SNSS: รูปแบบ `PART_NO YYMMDD QTY CLM_CODE` และใช้ข้อมูลตัวแรกเป็น Part No.
+- แยก Kanban JATH และเทียบ `JGF02-002060-31-4` กับ `JGF02-002060-31` ได้ โดยตัด Variant หนึ่งหลักเฉพาะตระกูล JATH
+- เปรียบเทียบ Exact Match และแสดงจุดต่างตัวแรก
+- หน้าผล OK สีเขียว / NG สีแดง ตัวใหญ่
+- บันทึก Scan Event ทุกครั้งพร้อม Raw Data, SHA-256, Rule, เวลา และผลเปรียบเทียบ
+- เก็บการสแกนแก้ไขเป็น Event ใหม่ ไม่เขียนทับของเดิม
+- หน้า `ประวัติ → เลือกรายการ → ดูรายละเอียด` แสดงผู้ตรวจ, Part No., ผลตรวจ และ Raw Data ทุก Scan Event
+- รองรับ Aisin แบบใหม่ `0116171-05030` → `16171-05030`
+- ลบช่องว่างใน Part No. ก่อนเทียบ เช่น `16171- 05030` → `16171-05030`
+- หลัง STAND ให้สแกน BOX ได้หลายใบ แล้วกด `BOX ครบ`
+- สแกน KANBAN ให้ครบตามจำนวน BOX; ระบบจับคู่กับ BOX ที่ Part No. ตรงกันอัตโนมัติ ไม่จำเป็นต้องเรียง Part No.
+- BOX ที่มี Part No. ซ้ำกันจะจับคู่กับ BOX ที่ยังไม่มีคู่และสแกนเข้ามาก่อน
+- KANBAN ที่ไม่มี BOX Part No. ตรงกันจะไม่ถูกนับ และให้สแกนใบที่ถูกต้องใหม่
+- ปุ่ม `CLEAR LAST` ล้าง BOX หรือ KANBAN ล่าสุดที่ยิงผิด โดยหลักฐาน RAW เดิมยังอยู่
+- สร้าง CSV ที่มีชื่อผู้ตรวจ, QR พนักงาน และ Raw Data ตามลำดับการสแกน แล้วเปิด Outlook พร้อมแนบไฟล์และกรอกผู้รับ `wirachai.so@tskforging.com` และ `sart.ka@tskforging.com` อัตโนมัติ
+- หาก PM75 ไม่มี Outlook ระบบจะแสดงเมนูเลือกแอปอีเมลแทน
+- ก่อนเริ่มแต่ละรายการ เลือกได้ว่าจะ `ตรวจ STAND` หรือ `ไม่ตรวจ STAND`
+- โหมดไม่ตรวจ Stand ใช้ลำดับ `BOX TAG → KANBAN` และบันทึกสถานะ `SKIP` ในประวัติ/CSV
 
-## Build ด้วย GitHub Actions
+## กติกา Kanban ใน v0.11
 
-1. Upload ทุกไฟล์ในโฟลเดอร์นี้ให้เห็น `app`, `.github`, `build.gradle`, `settings.gradle`
-2. ตรวจว่า `ProductionStore.java` ไม่มีคำว่า `Summary extends Totals`
-3. เปิด Actions → Build MTS Android APK → Run workflow
-4. ดาวน์โหลด Artifact `MTS-Android-v1.0.0-full-test`
-5. แตก ZIP และติดตั้ง `app-debug.apk`
+- Aisin: ตัดเลข `0` นำหน้าที่เป็นรหัส Kanban ออก แล้วใช้ Part No. เต็มที่เหลือ
+- DNTH: ต้องพบ Part No. รูปแบบ `TGY#####-####` หรือ `TG######-####` อย่างน้อย 2 ครั้งและทุกค่าต้องตรงกัน; BOX TAG ที่ขึ้นต้น `I` จะตัด `I` ก่อนเทียบ
+- SNSS: ตัวอย่าง `7521T0376 260805 80 CLM012` จะใช้ `7521T0376` เปรียบเทียบกับ STAND/BOX TAG
+- JATH: Part รูปแบบ `Jxx##-######-##` อาจมีหรือไม่มี Variant หนึ่งหลักต่อท้ายใน BOX/STAND; ระบบใช้รหัสฐานเทียบกับ KANBAN
+- ลูกค้าที่ไม่มีกติกาจะไม่ถูกเดาเป็น OK แต่จะแสดงว่าไม่รู้จักรูปแบบและบันทึก Raw Data เต็ม
 
-## ลำดับทดสอบ
+## เปิดและสร้าง APK
 
-1. Management Settings → ตรวจ/แก้เวลาและ Reasons → Save
-2. เลือกกะ → Scan Employee → Scan Machine → Start Shift
-3. Scan Production Tag → ตรวจ Original/Previous/This Shift → Confirm
-4. ทดสอบ Cancel และ Duplicate
-5. Add NG → เลือก Reason
-6. Stop M/C → ออกจากหน้า → ตรวจว่าเวลายังเดิน → END STOP
-7. Tool Life → Install Tool → Scan Tag → ตรวจยอด Life
-8. Close Shift → ใส่ Last Lot → ตอบ Break ทั้ง 3 ช่อง → Confirm
-9. ตรวจ Machine Shift Summary และไฟล์ `Downloads/MTS_Exports/MTS_Shift_*.xlsx`
+1. เปิดโฟลเดอร์นี้ด้วย Android Studio
+2. รอ Gradle Sync
+3. เลือก `Build > Build APK(s)`
+4. APK อยู่ที่ `app/build/outputs/apk/debug/app-debug.apk`
+5. คัดลอก APK ไป PM75 และติดตั้ง
 
-## หมายเหตุ
+## สร้าง APK ผ่าน GitHub โดยไม่ต้องติดตั้ง Android Studio
 
-- รุ่นนี้คำนวณ OT จากเวลาปิดที่เกินเวลาทำงานมาตรฐาน 9 ชั่วโมง
-- ข้อมูลจัดเก็บใน SQLite/SharedPreferences ของโทรศัพท์
-- การ Clear Tag History ไม่ลบ Shift Summary และ Events
+1. สร้าง Repository ใหม่ใน GitHub แล้วเลือก `Private`
+2. อัปโหลด **ไฟล์และโฟลเดอร์ทั้งหมดที่อยู่ข้างในโปรเจกต์นี้** รวมถึงโฟลเดอร์ `.github`
+3. เปิดแท็บ `Actions`
+4. เลือก `Build Check Tag_RS APK`
+5. กด `Run workflow` แล้วกดปุ่มสีเขียว `Run workflow`
+6. รอจนเครื่องหมายเป็นสีเขียว แล้วเปิดรายการ Build
+7. ที่หัวข้อ `Artifacts` กดดาวน์โหลด `Check_Tag_RS_v0.11_APK`
+8. แตก ZIP ที่ดาวน์โหลด จะได้ `Check_Tag_RS_v0.11.apk` สำหรับติดตั้งบน PM75
+
+Workflow จะทดสอบ Kanban Parser ก่อน Build หากชุดทดสอบไม่ผ่าน ระบบจะไม่สร้าง APK เพื่อป้องกันนำแอปที่ Parser ผิดไปติดตั้ง
+
+## ตั้งค่า PM75
+
+ใน `EmKit > ScanSettings` ให้ตั้ง Output เป็น Keyboard/Wedge และตั้ง Suffix เป็น Enter จากนั้นเปิดแอปแล้วกดปุ่มสแกนด้านข้าง
+
+ลำดับใช้งานหนึ่งรายการคือ `QR พนักงาน → เลือกตรวจ/ไม่ตรวจ STAND → STAND (ถ้าเลือก) → BOX TAG หลายใบ → BOX ครบ → KANBAN ตามจำนวน BOX → ผลตรวจ → รอสแกน QR พนักงานรอบใหม่`
+
+QR ทดสอบที่ให้มากับชุดนี้:
+
+- `EMPLOYEE|Mr.Burin`
+- `EMPLOYEE|Mr.Sakarin`
+- `EMPLOYEE|Mr.Wirachai`
+
+## การส่ง Outlook และ OneDrive
+
+1. กด `ส่ง CSV ผ่าน Outlook`
+2. แอปสร้างไฟล์ชื่อรูปแบบ `CheckTag_RS_2026-08-06_113000.csv`
+3. Outlook เปิดพร้อมผู้รับ `wirachai.so@tskforging.com` และ `sart.ka@tskforging.com`, หัวข้อ, ข้อความ และไฟล์แนบ
+4. ตรวจข้อมูลแล้วกด `Send` ใน Outlook
+5. เมื่อทดสอบรับอีเมลผ่านแล้ว ให้สร้าง Power Automate บันทึกไฟล์แนบลง `Check Tag_RS/Results/ปี/เดือน`
+
+แอปไม่เก็บรหัสผ่าน Outlook และยังไม่ส่งอีเมลเอง ผู้ใช้งานเป็นผู้กด `Send` ทุกครั้ง
+
+## งานถัดไป
+
+- เพิ่ม Kanban Parser สำหรับลูกค้ารายอื่นตามตัวอย่างที่ยืนยันแล้ว
+- เปลี่ยนชื่อทดสอบเป็นรหัสและชื่อพนักงานจริงเมื่อยืนยัน Master พนักงาน
+- Sync อัตโนมัติผ่าน Power Automate เมื่อได้รับ URL และอีเมลปลายทาง
+- ทดสอบ UI และ Scanner จริงบน PM75
