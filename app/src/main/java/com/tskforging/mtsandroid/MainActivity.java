@@ -29,6 +29,7 @@ import com.journeyapps.barcodescanner.ScanIntentResult;
 import com.journeyapps.barcodescanner.ScanOptions;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +41,7 @@ public final class MainActivity extends AppCompatActivity {
     private LinearLayout body;
     private MtsDb db;
     private ProductionStore production;
+    private ConfigStore config;
     private ScanTarget scanTarget;
     private String employee="", machine="", shift="DAY", shiftId="";
     private long shiftStart=0;
@@ -56,6 +58,7 @@ public final class MainActivity extends AppCompatActivity {
         super.onCreate(state);
         db=new MtsDb(this);
         production=new ProductionStore(this);
+        config=new ConfigStore(this);
         if(production.hasActiveShift()){
             employee=production.employee();machine=production.machine();shift=production.shiftName();shiftId=production.shiftId();shiftStart=production.startMs();showProductionAuto();
         }else showStartShift();
@@ -74,7 +77,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartShift() {
-        makeScreen("MTS Android v0.3.1");
+        makeScreen("MTS Android v1.0 FULL TEST");
         label("MANUFACTURING TRACEABILITY",26,NAVY,true);
         label("Offline Test Build • Galaxy S25 Ultra",15,Color.DKGRAY,false);
         gap(20);
@@ -91,11 +94,11 @@ public final class MainActivity extends AppCompatActivity {
         action("CONFIRM START SHIFT",GREEN,v->{
             shift=(String)spinner.getSelectedItem();
             if(employee.isEmpty()||machine.isEmpty()){toast("Scan Employee and Machine first");return;}
-            shiftStart=System.currentTimeMillis();production.startShift(shift,employee,machine,shiftStart);shiftId=production.shiftId();
-            showProductionAuto();
+            confirmStartShift();
         });
         gap(10); outline("LOGIC TEST MODE",v->startActivity(new Intent(this,LogicTestActivity.class)));
         outline("TAG HISTORY",v->showHistory());
+        outline("MANAGEMENT SETTINGS",v->showManagement());
         ProductionStore.Summary last=production.lastSummary();
         if(!last.shiftId.isEmpty())outline("LAST MACHINE SHIFT SUMMARY",v->showSummary(last,true));
     }
@@ -116,6 +119,7 @@ public final class MainActivity extends AppCompatActivity {
         outline("TOOL LIFE",v->showToolLife());
         outline("TAG HISTORY",v->showHistory());
         outline("EXPORT TAG HISTORY CSV",v->exportCsv());
+        outline("MANAGEMENT SETTINGS",v->showManagement());
         gap(22);danger("CLOSE SHIFT",v->showCloseShift());
     }
 
@@ -172,6 +176,8 @@ public final class MainActivity extends AppCompatActivity {
         }
         gap(8); outline(shiftStart>0?"BACK TO PRODUCTION":"BACK",v->{if(shiftStart>0)showProductionAuto();else showStartShift();});
         outline("EXPORT CSV",v->exportCsv());
+        danger("CLEAR HISTORY",v->new AlertDialog.Builder(this).setTitle("CLEAR TAG HISTORY?").setMessage("All confirmed raw Tag History will be deleted. Shift reports are not deleted.")
+                .setNegativeButton("CANCEL",null).setPositiveButton("DELETE",(d,w)->{int n=db.clearHistory();toast(n+" tag(s) deleted");showHistory();}).show());
     }
 
     private void exportCsv(){
@@ -192,7 +198,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void showAddNg(){
         if(production.activeItem().isEmpty()){toast("Scan and Confirm a Production Tag first");return;}
-        LinearLayout form=dialogForm();EditText qty=numberInput("NG Qty");Spinner reason=spinner(ProductionStore.NG_REASONS);
+        LinearLayout form=dialogForm();EditText qty=numberInput("NG Qty");Spinner reason=spinner(config.ngReasons());
         form.addView(qty);form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
         new AlertDialog.Builder(this).setTitle("ADD NG — "+production.activeItem()+" / "+production.activeLot()).setView(form)
                 .setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM",(d,w)->{
@@ -202,20 +208,26 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartStop(){
-        Spinner reason=spinner(ProductionStore.STOP_REASONS);LinearLayout form=dialogForm();form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
+        Spinner reason=spinner(config.stopReasons());LinearLayout form=dialogForm();form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
         new AlertDialog.Builder(this).setTitle("STOP M/C REASON").setView(form).setNegativeButton("CANCEL",null)
                 .setPositiveButton("START TIMER",(d,w)->{production.startStop(String.valueOf(reason.getSelectedItem()),System.currentTimeMillis());showProductionAuto();}).show();
     }
 
     private void showCloseShift(){
         LinearLayout form=dialogForm();TextView active=new TextView(this);active.setText("Last Item: "+emptyDash(production.activeItem())+"\nLast Lot: "+emptyDash(production.activeLot()));active.setTextSize(16);active.setTextColor(NAVY);active.setPadding(0,0,0,dp(8));
-        EditText ok=numberInput("Last Lot OK (0 if none)"),ng=numberInput("Last Lot NG (0 if none)");Spinner ngReason=spinner(ProductionStore.NG_REASONS);
-        form.addView(active);form.addView(ok);form.addView(ng);form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));
+        EditText ok=numberInput("Last Lot OK (0 if none)"),ng=numberInput("Last Lot NG (0 if none)");Spinner ngReason=spinner(config.ngReasons());
+        Spinner coffee=spinner(new String[]{"SELECT","0 time","1 time","2 times"});Spinner meal=spinner(new String[]{"SELECT","NO BREAK","BREAK"});Spinner otBreak=spinner(new String[]{"SELECT","NO BREAK","BREAK"});
+        form.addView(active);form.addView(ok);form.addView(ng);form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Coffee Break "+config.coffeeMinutes()+" min — select count");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Meal Break "+config.mealMinutes()+" min");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"OT Break "+config.otBreakMinutes()+" min");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(56)));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("CLOSE SHIFT").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM CLOSE",null).create();
         dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
-                long lastOk=longValue(ok),lastNg=longValue(ng);ProductionStore.Summary s=production.closeShift(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",System.currentTimeMillis());
-                dialog.dismiss();exportShift(s.shiftId,false);shiftStart=0;shiftId="";showSummary(s,true);
+                if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||otBreak.getSelectedItemPosition()==0){toast("BREAK CHECK REQUIRED — answer all red fields");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));otBreak.setBackgroundColor(Color.rgb(255,210,210));return;}
+                long actual=System.currentTimeMillis(),scheduled=scheduledClose(shift,actual),effective=actual;String closeReason="";boolean early=actual<scheduled-config.closeEarlyTolerance()*60000L;
+                long lastOk=longValue(ok),lastNg=longValue(ng);int coffeeCount=coffee.getSelectedItemPosition()-1,mealTaken=meal.getSelectedItemPosition()==2?1:0,otTaken=otBreak.getSelectedItemPosition()==2?1:0;
+                if(early){dialog.dismiss();requestCloseReason(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,coffeeCount,mealTaken,otTaken);return;}
+                if(Math.abs(actual-scheduled)<=config.closeEarlyTolerance()*60000L)effective=scheduled;
+                ProductionStore.Summary s=production.closeShift(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,closeReason,coffeeCount,mealTaken,otTaken,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());
+                dialog.dismiss();exportExcel(s,false);shiftStart=0;shiftId="";showSummary(s,true);
             }catch(Exception e){toast(e.getMessage()==null?"Cannot close shift":e.getMessage());}
         }));dialog.show();
     }
@@ -223,8 +235,8 @@ public final class MainActivity extends AppCompatActivity {
     private void showSummary(ProductionStore.Summary s,boolean closed){
         makeScreen(closed?"MACHINE SHIFT SUMMARY — CLOSED":"MACHINE SHIFT SUMMARY");
         label(s.machine+" • "+s.shift,20,NAVY,true);label(fmt(s.startMs)+" → "+fmt(s.closeMs),14,Color.DKGRAY,false);gap(10);
-        summaryCard("OK",s.ok,GREEN);summaryCard("NG",s.ng,RED);summaryCard("WORKING TIME",duration(s.workingSec),BLUE);summaryCard("STOP TIME",duration(s.stopSec),Color.rgb(198,94,0));
-        gap(8);outline("EXPORT SHIFT REPORT",v->exportShift(s.shiftId,true));
+        summaryCard("OK",s.ok,GREEN);summaryCard("NG",s.ng,RED);summaryCard("WORKING TIME",duration(s.workingSec),BLUE);summaryCard("STOP TIME",duration(s.stopSec),Color.rgb(198,94,0));summaryCard("OT",duration(s.otSec),Color.rgb(104,50,150));summaryCard("BREAK",duration(s.totalBreakSec),Color.rgb(0,110,120));
+        gap(8);outline("EXPORT EXCEL .XLSX",v->exportExcel(s,true));outline("EXPORT SHIFT CSV",v->exportShift(s.shiftId,true));
         if(closed)action("START NEXT SHIFT",GREEN,v->{employee="";machine="";shift="DAY";showStartShift();});
         else outline("BACK TO PRODUCTION",v->showProductionAuto());
     }
@@ -245,6 +257,48 @@ public final class MainActivity extends AppCompatActivity {
             if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/csv");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share MTS Shift Report"));}
         }catch(Exception e){toast(e.getMessage()==null?"Export failed":e.getMessage());}
     }
+
+    private void exportExcel(ProductionStore.Summary s,boolean share){
+        try{Uri uri=XlsxExporter.export(this,s,db.list(10000),production.reportRows(s.shiftId));toast("Excel saved: Downloads/MTS_Exports");
+            if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share MTS Excel"));}
+        }catch(Exception e){toast("Excel Export Error: "+(e.getMessage()==null?e.toString():e.getMessage()));}
+    }
+
+    private void confirmStartShift(){
+        long actual=System.currentTimeMillis(),scheduled=scheduledStart(shift,actual),diff=Math.abs(actual-scheduled),tol=config.startTolerance()*60000L;
+        if(diff>tol){Spinner reason=spinner(config.startReasons());LinearLayout form=dialogForm();labelFor(form,"Start outside standard time. Reason required");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
+            new AlertDialog.Builder(this).setTitle("START SHIFT REASON").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("START",(d,w)->startShiftNow(actual,actual,String.valueOf(reason.getSelectedItem()))).show();
+        }else startShiftNow(actual,scheduled,"");
+    }
+    private void startShiftNow(long actual,long effective,String reason){shiftStart=effective;production.startShift(shift,employee,machine,actual,effective,reason);shiftId=production.shiftId();showProductionAuto();}
+
+    private void requestCloseReason(long ok,long ng,String ngReason,long actual,long effective,int coffee,int meal,int otBreak){
+        Spinner reason=spinner(config.closeReasons());LinearLayout form=dialogForm();labelFor(form,"Closing more than "+config.closeEarlyTolerance()+" minutes early. Reason required");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
+        new AlertDialog.Builder(this).setTitle("CLOSE SHIFT REASON").setView(form).setNegativeButton("BACK",null).setPositiveButton("CONFIRM CLOSE",(d,w)->{
+            ProductionStore.Summary s=production.closeShift(ok,ng,ngReason,actual,effective,String.valueOf(reason.getSelectedItem()),coffee,meal,otBreak,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());exportExcel(s,false);shiftStart=0;shiftId="";showSummary(s,true);
+        }).show();
+    }
+
+    private long scheduledStart(String name,long now){return scheduleTime(name,"DAY".equals(name)?config.dayStart():config.nightStart(),now,true);}
+    private long scheduledClose(String name,long now){return scheduleTime(name,"DAY".equals(name)?config.dayClose():config.nightClose(),now,false);}
+    private long scheduleTime(String name,String hm,long now,boolean start){
+        String[] p=hm.split(":");Calendar c=Calendar.getInstance();c.setTimeInMillis(now);c.set(Calendar.HOUR_OF_DAY,Integer.parseInt(p[0]));c.set(Calendar.MINUTE,Integer.parseInt(p[1]));c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);
+        if("NIGHT".equals(name)){if(start&&c.getTimeInMillis()-now>12*3600000L)c.add(Calendar.DAY_OF_MONTH,-1);if(!start&&now-c.getTimeInMillis()>12*3600000L)c.add(Calendar.DAY_OF_MONTH,1);}
+        return c.getTimeInMillis();
+    }
+
+    private void showManagement(){
+        makeScreen("MANAGEMENT SETTINGS");label("SHIFT TIME (HH:mm)",19,NAVY,true);
+        EditText ds=textValue("DAY Start",config.dayStart()),dc=textValue("DAY Close",config.dayClose()),ns=textValue("NIGHT Start",config.nightStart()),nc=textValue("NIGHT Close",config.nightClose());body.addView(ds);body.addView(dc);body.addView(ns);body.addView(nc);
+        label("RULES / BREAK MINUTES",19,NAVY,true);EditText st=numberValue("Start tolerance",config.startTolerance()),ct=numberValue("Close early tolerance",config.closeEarlyTolerance()),cf=numberValue("Coffee",config.coffeeMinutes()),ml=numberValue("Meal",config.mealMinutes()),ot=numberValue("OT Break",config.otBreakMinutes());body.addView(st);body.addView(ct);body.addView(cf);body.addView(ml);body.addView(ot);
+        label("REASONS — separate with comma",19,NAVY,true);EditText ngr=textValue("NG Reasons",String.join(",",config.ngReasons())),spr=textValue("Stop Reasons",String.join(",",config.stopReasons())),str=textValue("Start Reasons",String.join(",",config.startReasons())),clr=textValue("Close Reasons",String.join(",",config.closeReasons()));ngr.setMinLines(3);spr.setMinLines(3);body.addView(ngr);body.addView(spr);body.addView(str);body.addView(clr);
+        action("SAVE SETTINGS",GREEN,v->{config.save(ds.getText().toString(),dc.getText().toString(),ns.getText().toString(),nc.getText().toString(),(int)longValue(st),(int)longValue(ct),(int)longValue(cf),(int)longValue(ml),(int)longValue(ot),ngr.getText().toString(),spr.getText().toString(),str.getText().toString(),clr.getText().toString());toast("Management settings saved");if(production.hasActiveShift())showProductionAuto();else showStartShift();});
+        outline("CANCEL",v->{if(production.hasActiveShift())showProductionAuto();else showStartShift();});
+    }
+
+    private EditText textValue(String hint,String value){EditText e=textInput(hint);e.setHint(hint);e.setText(value);return e;}
+    private EditText numberValue(String hint,int value){EditText e=numberInput(hint);e.setText(String.valueOf(value));e.setHint(hint+" (min)");return e;}
+    private void labelFor(LinearLayout parent,String text){TextView t=new TextView(this);t.setText(text);t.setTextColor(NAVY);t.setTextSize(15);t.setTypeface(null,1);t.setPadding(0,dp(8),0,0);parent.addView(t);}
 
     private LinearLayout dialogForm(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(22),dp(8),dp(22),0);return l;}
     private EditText numberInput(String hint){EditText e=new EditText(this);e.setHint(hint);e.setText("0");e.setTextSize(18);e.setTextColor(NAVY);e.setInputType(InputType.TYPE_CLASS_NUMBER);e.setSelectAllOnFocus(true);e.setMinHeight(dp(56));return e;}

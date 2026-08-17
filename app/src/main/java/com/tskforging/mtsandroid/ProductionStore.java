@@ -14,9 +14,6 @@ import java.util.List;
 import java.util.Locale;
 
 public final class ProductionStore extends SQLiteOpenHelper {
-    public static final String[] NG_REASONS={"Burr","Dent/Scratch","Dimension","Setting","Mat.Defect","Weight","Run-Out","Perpendicularity","Other"};
-    public static final String[] STOP_REASONS={"Change Item","NO OT","5S","WAIT RAW MATERIAL","Training","No Worker","SET-UP","Machine Trouble","Blade Change","Other"};
-
     public static final class QtyResult {
         public long tagQty, previousQty, thisShiftQty;
         public String item, lot, process;
@@ -24,18 +21,20 @@ public final class ProductionStore extends SQLiteOpenHelper {
     public static final class Totals { public long ok,ng,workingSec,stopSec; }
     public static final class Summary {
         public String shiftId="",shift="",employee="",machine="";
-        public long startMs,closeMs,ok,ng,workingSec,stopSec;
+        public String startReason="",closeReason="";
+        public long startMs,actualStartMs,closeMs,actualCloseMs,ok,ng,workingSec,stopSec,otSec,totalBreakSec;
+        public int coffeeCount,mealTaken,otBreakTaken;
     }
 
     private final SharedPreferences prefs;
 
     public ProductionStore(Context context){
-        super(context,"mts_production.db",null,1);
+        super(context,"mts_production.db",null,2);
         prefs=context.getSharedPreferences("mts_production_state",Context.MODE_PRIVATE);
     }
 
     @Override public void onCreate(SQLiteDatabase db){
-        db.execSQL("CREATE TABLE shifts(id TEXT PRIMARY KEY,shift_name TEXT,employee TEXT,machine TEXT,start_ms INTEGER,close_ms INTEGER,status TEXT)");
+        db.execSQL("CREATE TABLE shifts(id TEXT PRIMARY KEY,shift_name TEXT,employee TEXT,machine TEXT,start_ms INTEGER,actual_start_ms INTEGER,close_ms INTEGER,actual_close_ms INTEGER,status TEXT,start_reason TEXT,close_reason TEXT,coffee_count INTEGER DEFAULT 0,meal_taken INTEGER DEFAULT 0,ot_break_taken INTEGER DEFAULT 0,total_break_sec INTEGER DEFAULT 0,ot_sec INTEGER DEFAULT 0)");
         db.execSQL("CREATE TABLE lots(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,process TEXT,item TEXT,lot TEXT,tag_qty INTEGER,previous_qty INTEGER,this_qty INTEGER,raw_qr TEXT,confirmed_at INTEGER)");
         db.execSQL("CREATE TABLE ng_events(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,item TEXT,lot TEXT,qty INTEGER,reason TEXT,event_ms INTEGER)");
         db.execSQL("CREATE TABLE stop_events(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,reason TEXT,start_ms INTEGER,end_ms INTEGER,duration_sec INTEGER)");
@@ -44,7 +43,12 @@ public final class ProductionStore extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX idx_ng_shift ON ng_events(shift_id)");
         db.execSQL("CREATE INDEX idx_stop_shift ON stop_events(shift_id)");
     }
-    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){}
+    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){
+        if(oldVersion<2){
+            String[] sql={"ALTER TABLE shifts ADD COLUMN actual_start_ms INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN actual_close_ms INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN start_reason TEXT DEFAULT ''","ALTER TABLE shifts ADD COLUMN close_reason TEXT DEFAULT ''","ALTER TABLE shifts ADD COLUMN coffee_count INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN meal_taken INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN ot_break_taken INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN total_break_sec INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN ot_sec INTEGER DEFAULT 0"};
+            for(String q:sql)db.execSQL(q);
+        }
+    }
 
     public boolean hasActiveShift(){return prefs.getBoolean("active",false);}
     public String shiftId(){return prefs.getString("shiftId","");}
@@ -58,14 +62,16 @@ public final class ProductionStore extends SQLiteOpenHelper {
     public String stopReason(){return prefs.getString("stopReason","");}
     public long stopStart(){return prefs.getLong("stopStart",0);}
 
-    public void startShift(String shift,String employee,String machine,long now){
-        String id=new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date(now));
+    public void startShift(String shift,String employee,String machine,long actual,long effective,String reason){
+        String id=new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date(actual));
         ContentValues v=new ContentValues();v.put("id",id);v.put("shift_name",shift);v.put("employee",employee);v.put("machine",machine);
-        v.put("start_ms",now);v.put("close_ms",0);v.put("status","OPEN");getWritableDatabase().insertOrThrow("shifts",null,v);
+        v.put("start_ms",effective);v.put("actual_start_ms",actual);v.put("close_ms",0);v.put("actual_close_ms",0);v.put("start_reason",reason);v.put("status","OPEN");getWritableDatabase().insertOrThrow("shifts",null,v);
         prefs.edit().putBoolean("active",true).putString("shiftId",id).putString("shiftName",shift).putString("employee",employee)
-                .putString("machine",machine).putLong("startMs",now).putString("activeItem","").putString("activeLot","")
+                .putString("machine",machine).putLong("startMs",effective).putLong("actualStartMs",actual).putString("activeItem","").putString("activeLot","")
                 .putLong("stopStart",0).putString("stopReason","").apply();
     }
+
+    public void startShift(String shift,String employee,String machine,long now){startShift(shift,employee,machine,now,now,"");}
 
     public QtyResult confirmTag(TagParser.ResultTag tag,long now){
         QtyResult r=new QtyResult();r.item=tag.item;r.lot=tag.lot;r.process=tag.process;r.tagQty=parseQty(tag.qty);
@@ -121,28 +127,32 @@ public final class ProductionStore extends SQLiteOpenHelper {
         return t;
     }
 
-    public Summary closeShift(long lastOk,long lastNg,String ngReason,long now){
-        if(stopRunning())endStop(now);
+    public Summary closeShift(long lastOk,long lastNg,String ngReason,long actualClose,long effectiveClose,String closeReason,int coffeeCount,int mealTaken,int otBreakTaken,int coffeeMin,int mealMin,int otBreakMin){
+        if(stopRunning())endStop(actualClose);
         String item=activeItem(),lot=activeLot(),id=shiftId();
         if((lastOk>0||lastNg>0)&&(item.isEmpty()||lot.isEmpty()))throw new IllegalStateException("Scan a Tag before entering Last Lot Qty");
         if(lastOk>0){
-            ContentValues v=new ContentValues();v.put("shift_id",id);v.put("process","LAST LOT");v.put("item",item);v.put("lot",lot);v.put("tag_qty",lastOk);v.put("previous_qty",0);v.put("this_qty",lastOk);v.put("raw_qr","");v.put("confirmed_at",now);
+            ContentValues v=new ContentValues();v.put("shift_id",id);v.put("process","LAST LOT");v.put("item",item);v.put("lot",lot);v.put("tag_qty",lastOk);v.put("previous_qty",0);v.put("this_qty",lastOk);v.put("raw_qr","");v.put("confirmed_at",actualClose);
             getWritableDatabase().insertOrThrow("lots",null,v);
-            ContentValues c=new ContentValues();c.put("item",item);c.put("lot",lot);c.put("previous_ok",lastOk);c.put("updated_ms",now);
+            ContentValues c=new ContentValues();c.put("item",item);c.put("lot",lot);c.put("previous_ok",lastOk);c.put("updated_ms",actualClose);
             getWritableDatabase().insertWithOnConflict("carryover",null,c,SQLiteDatabase.CONFLICT_REPLACE);addToolLife(lastOk);
         }
-        if(lastNg>0){if(ngReason==null||ngReason.trim().isEmpty())throw new IllegalArgumentException("NG Reason is required");addNg(lastNg,ngReason,now);}
-        ContentValues u=new ContentValues();u.put("close_ms",now);u.put("status","CLOSED");getWritableDatabase().update("shifts",u,"id=?",new String[]{id});
+        if(lastNg>0){if(ngReason==null||ngReason.trim().isEmpty())throw new IllegalArgumentException("NG Reason is required");addNg(lastNg,ngReason,actualClose);}
+        long breakSec=(long)Math.max(0,coffeeCount)*coffeeMin*60L+(mealTaken==1?mealMin*60L:0)+(otBreakTaken==1?otBreakMin*60L:0);
+        long otSec=Math.max(0,(effectiveClose-startMs())/1000-9*3600L);
+        ContentValues u=new ContentValues();u.put("close_ms",effectiveClose);u.put("actual_close_ms",actualClose);u.put("close_reason",closeReason);u.put("coffee_count",coffeeCount);u.put("meal_taken",mealTaken);u.put("ot_break_taken",otBreakTaken);u.put("total_break_sec",breakSec);u.put("ot_sec",otSec);u.put("status","CLOSED");getWritableDatabase().update("shifts",u,"id=?",new String[]{id});
         Summary s=summary(id);saveLastSummary(s);prefs.edit().putBoolean("active",false).putLong("stopStart",0).apply();return s;
     }
 
+    public Summary closeShift(long lastOk,long lastNg,String ngReason,long now){return closeShift(lastOk,lastNg,ngReason,now,now,"",0,0,0,10,60,20);}
+
     public Summary summary(String id){
         Summary s=new Summary();s.shiftId=id;
-        try(Cursor c=getReadableDatabase().rawQuery("SELECT shift_name,employee,machine,start_ms,close_ms FROM shifts WHERE id=?",new String[]{id})){
-            if(c.moveToFirst()){s.shift=c.getString(0);s.employee=c.getString(1);s.machine=c.getString(2);s.startMs=c.getLong(3);s.closeMs=c.getLong(4);}
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT shift_name,employee,machine,start_ms,actual_start_ms,close_ms,actual_close_ms,start_reason,close_reason,coffee_count,meal_taken,ot_break_taken,total_break_sec,ot_sec FROM shifts WHERE id=?",new String[]{id})){
+            if(c.moveToFirst()){s.shift=c.getString(0);s.employee=c.getString(1);s.machine=c.getString(2);s.startMs=c.getLong(3);s.actualStartMs=c.getLong(4);s.closeMs=c.getLong(5);s.actualCloseMs=c.getLong(6);s.startReason=c.getString(7);s.closeReason=c.getString(8);s.coffeeCount=c.getInt(9);s.mealTaken=c.getInt(10);s.otBreakTaken=c.getInt(11);s.totalBreakSec=c.getLong(12);s.otSec=c.getLong(13);}
         }
         s.ok=sum("SELECT COALESCE(SUM(this_qty),0) FROM lots WHERE shift_id=?",id);s.ng=sum("SELECT COALESCE(SUM(qty),0) FROM ng_events WHERE shift_id=?",id);
-        s.stopSec=sum("SELECT COALESCE(SUM(duration_sec),0) FROM stop_events WHERE shift_id=?",id);long end=s.closeMs>0?s.closeMs:System.currentTimeMillis();s.workingSec=Math.max(0,(end-s.startMs)/1000-s.stopSec);return s;
+        s.stopSec=sum("SELECT COALESCE(SUM(duration_sec),0) FROM stop_events WHERE shift_id=?",id);long end=s.closeMs>0?s.closeMs:System.currentTimeMillis();s.workingSec=Math.max(0,(end-s.startMs)/1000-s.stopSec-s.totalBreakSec);return s;
     }
 
     public Summary lastSummary(){
@@ -158,7 +168,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
 
     public List<String[]> reportRows(String id){
         List<String[]> rows=new ArrayList<>();Summary s=summary(id);String base=s.shift+"|"+s.employee+"|"+s.machine;
-        rows.add(new String[]{"SHIFT",fmt(s.closeMs),id,base,"","","",String.valueOf(s.ok),"OK="+s.ok+"; NG="+s.ng+"; WorkingSec="+s.workingSec+"; StopSec="+s.stopSec,"",""});
+        rows.add(new String[]{"SHIFT",fmt(s.actualCloseMs>0?s.actualCloseMs:s.closeMs),id,base,"","","",String.valueOf(s.ok),"OK="+s.ok+"; NG="+s.ng+"; WorkingSec="+s.workingSec+"; StopSec="+s.stopSec+"; OTSec="+s.otSec+"; BreakSec="+s.totalBreakSec+"; Coffee="+s.coffeeCount+"; Meal="+s.mealTaken+"; OTBreak="+s.otBreakTaken+"; StartReason="+s.startReason+"; CloseReason="+s.closeReason,"",""});
         try(Cursor c=getReadableDatabase().rawQuery("SELECT confirmed_at,process,item,lot,tag_qty,previous_qty,this_qty,raw_qr FROM lots WHERE shift_id=? ORDER BY confirmed_at",new String[]{id})){
             while(c.moveToNext())rows.add(new String[]{"TAG",fmt(c.getLong(0)),id,base,c.getString(2),c.getString(3),c.getString(1),String.valueOf(c.getLong(6)),"TagQty="+c.getLong(4)+"; Previous="+c.getLong(5),"",c.getString(7)});
         }

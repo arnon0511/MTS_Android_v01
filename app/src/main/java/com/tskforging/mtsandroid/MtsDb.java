@@ -67,4 +67,8 @@ public final class MtsDb extends SQLiteOpenHelper {
         }
         return out;
     }
+
+    public int clearHistory() {
+        return getWritableDatabase().delete("tag_history", null, null);
+    }
 }
