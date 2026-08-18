@@ -1,4 +1,11 @@
-# MTS Android v1.1.1 — Thai UI / Material & Tool Test
+# MTS Android v1.1.2 — Close Shift Scroll Fix
+
+## แก้ไขใน v1.1.2
+
+- หน้า Close Shift เลื่อนขึ้น-ลงได้ทั้งฟอร์ม
+- ช่องพัก OT 20 นาทีแสดงครบและเลือก พัก/ไม่ได้พัก ได้
+- เพิ่มความสูงช่องเลือกและระยะขอบล่าง ป้องกันข้อความเกินกรอบ
+- เมื่อยังไม่ตอบ OT Break ระบบเลื่อนไปยังช่องที่ต้องตอบอัตโนมัติ
 
 ## เพิ่มใน v1.1.1
 
@@ -45,7 +52,7 @@
 1. Upload ทุกไฟล์ในโฟลเดอร์นี้ให้เห็น `app`, `.github`, `build.gradle`, `settings.gradle`
 2. ตรวจว่า `ProductionStore.java` ไม่มีคำว่า `Summary extends Totals`
 3. เปิด Actions → Build MTS Android APK → Run workflow
-4. ดาวน์โหลด Artifact `MTS-Android-v1.1.1-thai-ui`
+4. ดาวน์โหลด Artifact `MTS-Android-v1.1.2-close-shift-scroll-fix`
 5. แตก ZIP และติดตั้ง `app-debug.apk`
 
 ## ลำดับทดสอบ

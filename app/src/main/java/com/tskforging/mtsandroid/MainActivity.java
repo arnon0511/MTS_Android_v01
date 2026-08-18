@@ -78,7 +78,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartShift() {
-        makeScreen("MTS Android v1.1.1 — ทดสอบวัตถุดิบและ Tool");
+        makeScreen("MTS Android v1.1.2 — ทดสอบวัตถุดิบและ Tool");
         label("ระบบตรวจสอบย้อนกลับการผลิต / MANUFACTURING TRACEABILITY",24,NAVY,true);
         label("รุ่นทดสอบ Offline • Galaxy S25 Ultra",15,Color.DKGRAY,false);
         gap(20);
@@ -234,11 +234,14 @@ public final class MainActivity extends AppCompatActivity {
         EditText ok=numberInput("0"),ng=numberInput("0");Spinner ngReason=spinner(config.ngReasons());
         Spinner coffee=spinner(new String[]{"เลือก / SELECT","0 ครั้ง / 0 time","1 ครั้ง / 1 time","2 ครั้ง / 2 times"});Spinner meal=spinner(new String[]{"เลือก / SELECT","ไม่ได้พัก / NO BREAK","พัก / BREAK"});Spinner otBreak=spinner(new String[]{"เลือก / SELECT","ไม่ได้พัก / NO BREAK","พัก / BREAK"});
         if(production.noOt()){otBreak.setSelection(1);otBreak.setEnabled(false);}
-        form.addView(active);labelFor(form,"จำนวนงานดี Lot สุดท้าย / Last Lot OK");form.addView(ok);labelFor(form,"จำนวนงานเสีย Lot สุดท้าย / Last Lot NG");form.addView(ng);labelFor(form,"สาเหตุงานเสีย / NG Reason");form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"พักกาแฟ / Coffee Break "+config.coffeeMinutes()+" นาที — เลือกจำนวนครั้ง");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"พักอาหาร / Meal Break "+config.mealMinutes()+" นาที");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"พัก OT / OT Break "+config.otBreakMinutes()+" นาที");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(56)));
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("ปิดกะ / CLOSE SHIFT").setView(form).setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("ยืนยันปิดกะ / CONFIRM CLOSE",null).create();
-        dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+        form.addView(active);labelFor(form,"จำนวนงานดี Lot สุดท้าย / Last Lot OK");form.addView(ok);labelFor(form,"จำนวนงานเสีย Lot สุดท้าย / Last Lot NG");form.addView(ng);labelFor(form,"สาเหตุงานเสีย / NG Reason");form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(60)));labelFor(form,"พักกาแฟ / Coffee Break "+config.coffeeMinutes()+" นาที — เลือกจำนวนครั้ง");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(60)));labelFor(form,"พักอาหาร / Meal Break "+config.mealMinutes()+" นาที");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(60)));labelFor(form,"พัก OT / OT Break "+config.otBreakMinutes()+" นาที — เลือก พัก หรือ ไม่ได้พัก");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(60)));gapFor(form,dp(20));
+        ScrollView dialogScroll=new ScrollView(this);dialogScroll.setFillViewport(false);dialogScroll.setVerticalScrollBarEnabled(true);dialogScroll.addView(form,new ScrollView.LayoutParams(-1,-2));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("ปิดกะ / CLOSE SHIFT").setView(dialogScroll).setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("ยืนยันปิดกะ / CONFIRM CLOSE",null).create();
+        dialog.setOnShowListener(x->{
+            if(dialog.getWindow()!=null)dialog.getWindow().setLayout(-1,(int)(getResources().getDisplayMetrics().heightPixels*0.90f));
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
-                boolean needOt=!production.noOt();if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||(needOt&&otBreak.getSelectedItemPosition()==0)){toast("ต้องตอบข้อมูลการพักให้ครบทุกช่องสีแดง / BREAK CHECK REQUIRED");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));if(needOt)otBreak.setBackgroundColor(Color.rgb(255,210,210));return;}
+                boolean needOt=!production.noOt();if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||(needOt&&otBreak.getSelectedItemPosition()==0)){toast("ต้องตอบข้อมูลการพักให้ครบทุกช่องสีแดง / BREAK CHECK REQUIRED");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));if(needOt){otBreak.setBackgroundColor(Color.rgb(255,210,210));dialogScroll.post(()->dialogScroll.smoothScrollTo(0,otBreak.getBottom()));}return;}
                 long actual=System.currentTimeMillis(),scheduled=scheduledClose(shift,actual),effective=actual;String closeReason="";boolean early=actual<scheduled-config.closeEarlyTolerance()*60000L;
                 long lastOk=longValue(ok),lastNg=longValue(ng);int coffeeCount=coffee.getSelectedItemPosition()-1,mealTaken=meal.getSelectedItemPosition()==2?1:0,otTaken=needOt&&otBreak.getSelectedItemPosition()==2?1:0;
                 if(early){dialog.dismiss();requestCloseReason(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,coffeeCount,mealTaken,otTaken);return;}
@@ -246,7 +249,8 @@ public final class MainActivity extends AppCompatActivity {
                 ProductionStore.Summary s=production.closeShift(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,closeReason,coffeeCount,mealTaken,otTaken,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());
                 dialog.dismiss();exportExcel(s,false);shiftStart=0;shiftId="";showSummary(s,true);
             }catch(Exception e){toast(e.getMessage()==null?"ปิดกะไม่สำเร็จ / Cannot close shift":e.getMessage());}
-        }));dialog.show();
+            });
+        });dialog.show();
     }
 
     private void showSummary(ProductionStore.Summary s,boolean closed){
@@ -316,6 +320,7 @@ public final class MainActivity extends AppCompatActivity {
     private EditText textValue(String hint,String value){EditText e=textInput(hint);e.setHint(hint);e.setText(value);return e;}
     private EditText numberValue(String hint,int value){EditText e=numberInput(hint);e.setText(String.valueOf(value));e.setHint(hint+" (min)");return e;}
     private void labelFor(LinearLayout parent,String text){TextView t=new TextView(this);t.setText(text);t.setTextColor(NAVY);t.setTextSize(15);t.setTypeface(null,1);t.setPadding(0,dp(8),0,0);parent.addView(t);}
+    private void gapFor(LinearLayout parent,int px){parent.addView(new View(this),new LinearLayout.LayoutParams(1,px));}
 
     private LinearLayout dialogForm(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(22),dp(8),dp(22),0);return l;}
     private EditText numberInput(String hint){EditText e=new EditText(this);e.setHint(hint);e.setText("0");e.setTextSize(18);e.setTextColor(NAVY);e.setInputType(InputType.TYPE_CLASS_NUMBER);e.setSelectAllOnFocus(true);e.setMinHeight(dp(56));return e;}
