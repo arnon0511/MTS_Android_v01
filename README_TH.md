@@ -1,4 +1,11 @@
-# MTS Android v1.1.0 — Material & Tool Test
+# MTS Android v1.1.1 — Thai UI / Material & Tool Test
+
+## เพิ่มใน v1.1.1
+
+- เพิ่มข้อความภาษาไทย–อังกฤษครบทุกหน้าหลัก ปุ่ม Dialog, Toast และหน้าสแกน
+- เพิ่มภาษาไทยใน Production Auto, Tag History, Shift Summary, Tool Life, Management และ Logic Test
+- เพิ่มรายการสาเหตุเริ่มต้นแบบไทย–อังกฤษ โดยคงข้อมูลและ Logic เดิม
+- แสดงกะกลางวัน/กลางคืนเป็นภาษาไทย โดยยังบันทึกค่า DAY/NIGHT เหมือนเดิม
 
 ## เพิ่มใน v1.1.0
 
@@ -38,7 +45,7 @@
 1. Upload ทุกไฟล์ในโฟลเดอร์นี้ให้เห็น `app`, `.github`, `build.gradle`, `settings.gradle`
 2. ตรวจว่า `ProductionStore.java` ไม่มีคำว่า `Summary extends Totals`
 3. เปิด Actions → Build MTS Android APK → Run workflow
-4. ดาวน์โหลด Artifact `MTS-Android-v1.1.0-material-tool-test`
+4. ดาวน์โหลด Artifact `MTS-Android-v1.1.1-thai-ui`
 5. แตก ZIP และติดตั้ง `app-debug.apk`
 
 ## ลำดับทดสอบ

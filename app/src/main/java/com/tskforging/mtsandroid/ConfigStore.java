@@ -9,10 +9,10 @@ import java.util.List;
 
 public final class ConfigStore {
     private final SharedPreferences p;
-    private static final String DEFAULT_NG="Burr|Dent/Scratch|Dimension|Setting|Mat.Defect|Weight|Run-Out|Perpendicularity|Other";
-    private static final String DEFAULT_STOP="Change Item|NO OT|5S|WAIT RAW MATERIAL|Training|No Worker|SET-UP|Machine Trouble|Change Blade|Other";
-    private static final String DEFAULT_SHIFT="No Plan|5S|Other";
-    private static final String DEFAULT_CLOSE="No Plan|OT Finish|Other";
+    private static final String DEFAULT_NG="ครีบ / Burr|รอยบุบ-รอยขีดข่วน / Dent-Scratch|ขนาด / Dimension|การตั้งค่า / Setting|วัตถุดิบผิดปกติ / Mat.Defect|น้ำหนัก / Weight|Run-Out|ความตั้งฉาก / Perpendicularity|อื่น ๆ / Other";
+    private static final String DEFAULT_STOP="เปลี่ยนงาน / Change Item|ไม่มี OT / NO OT|ทำ 5ส / 5S|รอวัตถุดิบ / WAIT RAW MATERIAL|ฝึกอบรม / Training|ไม่มีพนักงาน / No Worker|ตั้งเครื่อง / SET-UP|เครื่องจักรขัดข้อง / Machine Trouble|เปลี่ยนใบเลื่อย / Change Blade|อื่น ๆ / Other";
+    private static final String DEFAULT_SHIFT="ไม่มีแผน / No Plan|ทำ 5ส / 5S|อื่น ๆ / Other";
+    private static final String DEFAULT_CLOSE="ไม่มีแผน / No Plan|OT เสร็จ / OT Finish|อื่น ๆ / Other";
 
     public ConfigStore(Context c){p=c.getSharedPreferences("mts_management",Context.MODE_PRIVATE);}
     public String dayStart(){return p.getString("dayStart","08:00");}
@@ -36,7 +36,7 @@ public final class ConfigStore {
                 .putString("ngReasons",joinClean(ng,DEFAULT_NG)).putString("stopReasons",joinClean(stop,DEFAULT_STOP))
                 .putString("startReasons",joinClean(start,DEFAULT_SHIFT)).putString("closeReasons",joinClean(close,DEFAULT_CLOSE)).apply();
     }
-    private static String[] split(String s){List<String> out=new ArrayList<>();for(String x:s.split("\\|")){x=x.trim();if(!x.isEmpty())out.add(x);}return out.isEmpty()?new String[]{"Other"}:out.toArray(new String[0]);}
+    private static String[] split(String s){List<String> out=new ArrayList<>();for(String x:s.split("\\|")){x=x.trim();if(!x.isEmpty())out.add(x);}return out.isEmpty()?new String[]{"อื่น ๆ / Other"}:out.toArray(new String[0]);}
     private static String joinClean(String s,String fallback){return String.join("|",split(s==null?fallback:s.replace(",","|")));}
     private static String validTime(String s,String fallback){if(s!=null&&s.matches("(?:[01]\\d|2[0-3]):[0-5]\\d"))return s;return fallback;}
 }

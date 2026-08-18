@@ -78,220 +78,220 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartShift() {
-        makeScreen("MTS Android v1.1 MATERIAL & TOOL TEST");
-        label("MANUFACTURING TRACEABILITY",26,NAVY,true);
-        label("Offline Test Build • Galaxy S25 Ultra",15,Color.DKGRAY,false);
+        makeScreen("MTS Android v1.1.1 — ทดสอบวัตถุดิบและ Tool");
+        label("ระบบตรวจสอบย้อนกลับการผลิต / MANUFACTURING TRACEABILITY",24,NAVY,true);
+        label("รุ่นทดสอบ Offline • Galaxy S25 Ultra",15,Color.DKGRAY,false);
         gap(20);
-        label("1. SELECT SHIFT",18,NAVY,true);
+        label("1. เลือกกะ / SELECT SHIFT",18,NAVY,true);
         Spinner spinner=new Spinner(this);
-        spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"DAY","NIGHT"}));
+        spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"กะกลางวัน / DAY","กะกลางคืน / NIGHT"}));
         spinner.setSelection("NIGHT".equals(shift)?1:0);
         body.addView(spinner,new LinearLayout.LayoutParams(-1,dp(56)));
         gap(12);
-        action("SCAN EMPLOYEE QR",BLUE,v->{shift=(String)spinner.getSelectedItem(); scan(ScanTarget.EMPLOYEE,"Scan Employee QR");});
-        statusCard("Employee",employee.isEmpty()?"Not scanned":employee);
-        action("SCAN MACHINE QR",BLUE,v->scan(ScanTarget.MACHINE,"Scan Machine QR"));
-        statusCard("Machine",machine.isEmpty()?"Not scanned":machine);
-        action("CONFIRM START SHIFT",GREEN,v->{
-            shift=(String)spinner.getSelectedItem();
-            if(employee.isEmpty()||machine.isEmpty()){toast("Scan Employee and Machine first");return;}
+        action("สแกน QR พนักงาน / SCAN EMPLOYEE QR",BLUE,v->{shift=spinner.getSelectedItemPosition()==1?"NIGHT":"DAY"; scan(ScanTarget.EMPLOYEE,"สแกน QR พนักงาน / Scan Employee QR");});
+        statusCard("พนักงาน / Employee",employee.isEmpty()?"ยังไม่สแกน / Not scanned":employee);
+        action("สแกน QR เครื่องจักร / SCAN MACHINE QR",BLUE,v->scan(ScanTarget.MACHINE,"สแกน QR เครื่องจักร / Scan Machine QR"));
+        statusCard("เครื่องจักร / Machine",machine.isEmpty()?"ยังไม่สแกน / Not scanned":machine);
+        action("ยืนยันเริ่มกะ / CONFIRM START SHIFT",GREEN,v->{
+            shift=spinner.getSelectedItemPosition()==1?"NIGHT":"DAY";
+            if(employee.isEmpty()||machine.isEmpty()){toast("กรุณาสแกนพนักงานและเครื่องจักรก่อน / Scan Employee and Machine first");return;}
             confirmStartShift();
         });
-        gap(10); outline("LOGIC TEST MODE",v->startActivity(new Intent(this,LogicTestActivity.class)));
-        outline("TAG HISTORY",v->showHistory());
+        gap(10); outline("โหมดทดสอบ Logic / LOGIC TEST MODE",v->startActivity(new Intent(this,LogicTestActivity.class)));
+        outline("ประวัติ TAG / TAG HISTORY",v->showHistory());
         outline("ตรวจสอบวัตถุดิบ / MATERIAL VERIFICATION",v->startActivity(new Intent(this,MaterialVerificationActivity.class)));
-        outline("MANAGEMENT SETTINGS",v->showManagement());
+        outline("ตั้งค่าระบบ / MANAGEMENT SETTINGS",v->showManagement());
         ProductionStore.Summary last=production.lastSummary();
-        if(!last.shiftId.isEmpty())outline("LAST MACHINE SHIFT SUMMARY",v->showSummary(last,true));
+        if(!last.shiftId.isEmpty())outline("สรุปกะล่าสุด / LAST MACHINE SHIFT SUMMARY",v->showSummary(last,true));
     }
 
     private void showProductionAuto() {
-        makeScreen("PRODUCTION AUTO");
+        makeScreen("ผลิตอัตโนมัติ / PRODUCTION AUTO");
         productionScreen=true;
-        statusCard("Shift",shift+"  •  "+fmt(shiftStart));
-        statusCard("Employee / Machine",employee+"  /  "+machine);
+        statusCard("กะ / Shift",shift+"  •  "+fmt(shiftStart));
+        statusCard("พนักงาน / เครื่องจักร — Employee / Machine",employee+"  /  "+machine);
         timerText=new TextView(this);timerText.setTextSize(18);timerText.setTextColor(NAVY);timerText.setTypeface(null,1);timerText.setPadding(dp(16),dp(13),dp(16),dp(13));timerText.setBackgroundColor(WHITE);
         LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,-2);tlp.setMargins(0,dp(6),0,dp(6));body.addView(timerText,tlp);updateTimer();timerHandler.postDelayed(timerTick,1000);
         gap(12);
-        action("สแกน TAG ผลิต / SCAN PRODUCTION TAG",BLUE,v->scan(ScanTarget.TAG,"Scan WIP or FG Result Tag"));
+        action("สแกน TAG ผลิต / SCAN PRODUCTION TAG",BLUE,v->scan(ScanTarget.TAG,"สแกน TAG ผลิต WIP หรือ FG / Scan WIP or FG Result Tag"));
         action("ลงงานเสีย / ADD NG",Color.rgb(198,94,0),v->showAddNg());
-        if(production.stopRunning())danger("END STOP — "+production.stopReason(),v->{production.endStop(System.currentTimeMillis());toast("Stop Time saved");showProductionAuto();});
+        if(production.stopRunning())danger("จบการหยุด / END STOP — "+production.stopReason(),v->{production.endStop(System.currentTimeMillis());toast("บันทึกเวลาหยุดแล้ว / Stop Time saved");showProductionAuto();});
         else action("หยุดเครื่อง / STOP M/C",Color.rgb(198,94,0),v->showStartStop());
         gap(8);outline("สรุปผลกะ / MACHINE SHIFT SUMMARY",v->showSummary(production.summary(shiftId),false));
         outline("อายุ TOOL / TOOL LIFE",v->showToolLife());
         outline("ประวัติ TAG / TAG HISTORY",v->showHistory());
-        outline("EXPORT TAG HISTORY CSV",v->exportCsv());
-        outline("MANAGEMENT SETTINGS",v->showManagement());
+        outline("ส่งออกประวัติ TAG เป็น CSV / EXPORT TAG HISTORY CSV",v->exportCsv());
+        outline("ตั้งค่าระบบ / MANAGEMENT SETTINGS",v->showManagement());
         gap(22);danger("ปิดกะ / CLOSE SHIFT",v->showCloseShift());
     }
 
     private void onScanResult(ScanIntentResult result) {
-        if(result.getContents()==null){toast("Scan cancelled");return;}
+        if(result.getContents()==null){toast("ยกเลิกการสแกน / Scan cancelled");return;}
         String raw=result.getContents().trim();
         if(scanTarget==ScanTarget.EMPLOYEE){employee=readIdentity(raw,"EMP");showStartShift();return;}
         if(scanTarget==ScanTarget.MACHINE){machine=readIdentity(raw,"MC");showStartShift();return;}
         if(scanTarget==ScanTarget.BLADE){
-            try{production.changeBlade(readIdentity(raw,"BLADE"),pendingBladeReason,System.currentTimeMillis());pendingBladeReason="";toast("ติดตั้ง Blade ใหม่และ Reset Tool Life แล้ว");showToolLife();}
-            catch(Exception e){toast(e.getMessage()==null?"Cannot save Blade":e.getMessage());}
+            try{production.changeBlade(readIdentity(raw,"BLADE"),pendingBladeReason,System.currentTimeMillis());pendingBladeReason="";toast("ติดตั้ง Blade ใหม่และรีเซ็ตอายุ Tool แล้ว / Blade installed and Tool Life reset");showToolLife();}
+            catch(Exception e){toast(e.getMessage()==null?"บันทึก Blade ไม่สำเร็จ / Cannot save Blade":e.getMessage());}
             return;
         }
         pendingTag=TagParser.parse(raw);
-        if(!pendingTag.isValid()){showError("UNKNOWN TAG", "Expected WIP 13 fields or FG 14 fields.\n\nRAW:\n"+raw);return;}
+        if(!pendingTag.isValid()){showError("ไม่รู้จัก TAG / UNKNOWN TAG", "ต้องเป็น WIP 13 ช่อง หรือ FG 14 ช่อง / Expected WIP 13 fields or FG 14 fields.\n\nข้อมูลดิบ / RAW:\n"+raw);return;}
         if(db.isDuplicate(pendingTag.duplicateKey())){
-            showError("DUPLICATE TAG", "Process: "+pendingTag.process+"\nItem: "+pendingTag.item+"\nLot: "+pendingTag.lot+"\n\nNot recorded.");return;
+            showError("TAG ซ้ำ / DUPLICATE TAG", "กระบวนการ / Process: "+pendingTag.process+"\nรหัส Item / Item: "+pendingTag.item+"\nเลข Lot / Lot: "+pendingTag.lot+"\n\nไม่บันทึกข้อมูล / Not recorded.");return;
         }
         showTagConfirm();
     }
 
     private void showTagConfirm() {
-        makeScreen("SCAN RESULT TAG");
-        label("PROGRAM CHECK: OK",24,GREEN,true);
-        statusCard("Type / Process",pendingTag.type+"  /  "+pendingTag.process);
-        statusCard("Item No.",pendingTag.item);
-        statusCard("Part No.",pendingTag.partNo);
-        statusCard("Part Name",pendingTag.partName);
+        makeScreen("ผลการสแกน TAG / SCAN RESULT TAG");
+        label("โปรแกรมตรวจสอบ: ผ่าน / PROGRAM CHECK: OK",22,GREEN,true);
+        statusCard("ประเภท / กระบวนการ — Type / Process",pendingTag.type+"  /  "+pendingTag.process);
+        statusCard("รหัส Item / Item No.",pendingTag.item);
+        statusCard("รหัสชิ้นงาน / Part No.",pendingTag.partNo);
+        statusCard("ชื่อชิ้นงาน / Part Name",pendingTag.partName);
         long tagQty=production.parsedTagQty(pendingTag.qty),previous=production.previousForItem(pendingTag.item),thisQty=Math.max(0,tagQty-previous);
-        statusCard("Lot No.",pendingTag.lot);
-        statusCard("Tag Qty (Original)",String.valueOf(tagQty));
-        statusCard("Previous Shift Qty",String.valueOf(previous));
-        statusCard("This Shift Qty OK",String.valueOf(thisQty));
-        statusCard("Charge No.",pendingTag.charge);
+        statusCard("เลข Lot / Lot No.",pendingTag.lot);
+        statusCard("จำนวนเดิมใน Tag / Tag Qty (Original)",String.valueOf(tagQty));
+        statusCard("จำนวนคงเหลือจากกะก่อน / Previous Shift Qty",String.valueOf(previous));
+        statusCard("จำนวน OK กะนี้ / This Shift Qty OK",String.valueOf(thisQty));
+        statusCard("เลข Charge / Charge No.",pendingTag.charge);
         gap(12);
-        action("CONFIRM",GREEN,v->{
+        action("ยืนยัน / CONFIRM",GREEN,v->{
             long now=System.currentTimeMillis();ProductionStore.QtyResult qty=production.confirmTag(pendingTag,now);
             long id=db.confirm(shiftId,shift,employee,machine,pendingTag,now);
-            if(id<0){showError("SAVE ERROR","Tag was not recorded. It may already exist.");}
-            else{pendingTag=null;toast("Confirmed • This Shift OK = "+qty.thisShiftQty);showProductionAuto();}
+            if(id<0){showError("บันทึกไม่สำเร็จ / SAVE ERROR","ไม่ได้บันทึก Tag อาจมีข้อมูลนี้อยู่แล้ว / Tag was not recorded. It may already exist.");}
+            else{pendingTag=null;toast("ยืนยันแล้ว • OK กะนี้ = "+qty.thisShiftQty+" / Confirmed");showProductionAuto();}
         });
-        outline("CANCEL — DO NOT SAVE",v->{pendingTag=null;showProductionAuto();});
+        outline("ยกเลิก — ไม่บันทึก / CANCEL — DO NOT SAVE",v->{pendingTag=null;showProductionAuto();});
     }
 
     private void showHistory() {
-        makeScreen("TAG HISTORY");
+        makeScreen("ประวัติ TAG / TAG HISTORY");
         List<MtsDb.HistoryRow> rows=db.list(100);
-        label(rows.size()+" confirmed tag(s) • newest first",15,Color.DKGRAY,false);
+        label("ยืนยันแล้ว "+rows.size()+" Tag • รายการใหม่อยู่บน / confirmed tag(s) • newest first",15,Color.DKGRAY,false);
         gap(8);
-        if(rows.isEmpty()) label("No confirmed Tag History",18,Color.GRAY,true);
+        if(rows.isEmpty()) label("ยังไม่มีประวัติ Tag ที่ยืนยัน / No confirmed Tag History",18,Color.GRAY,true);
         for(MtsDb.HistoryRow r:rows){
             MaterialCardView card=new MaterialCardView(this); card.setRadius(dp(12)); card.setCardElevation(dp(1));
             card.setStrokeColor(Color.rgb(205,216,225));card.setStrokeWidth(dp(1));
             TextView t=new TextView(this);t.setPadding(dp(14),dp(12),dp(14),dp(12));t.setTextColor(NAVY);t.setTextSize(15);
-            t.setText(r.process+"  •  "+r.item+"\nLot: "+r.lot+"   Qty: "+r.qty+"\n"+fmt(r.confirmedAt));
-            card.addView(t); card.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("RAW TAG DETAIL")
-                    .setMessage(r.raw).setPositiveButton("CLOSE",null).show());
+            t.setText(r.process+"  •  "+r.item+"\nLot: "+r.lot+"   จำนวน / Qty: "+r.qty+"\n"+fmt(r.confirmedAt));
+            card.addView(t); card.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("รายละเอียด TAG ดิบ / RAW TAG DETAIL")
+                    .setMessage(r.raw).setPositiveButton("ปิด / CLOSE",null).show());
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,dp(10));body.addView(card,lp);
         }
-        gap(8); outline(shiftStart>0?"BACK TO PRODUCTION":"BACK",v->{if(shiftStart>0)showProductionAuto();else showStartShift();});
-        outline("EXPORT CSV",v->exportCsv());
-        danger("CLEAR HISTORY",v->new AlertDialog.Builder(this).setTitle("CLEAR TAG HISTORY?").setMessage("All confirmed raw Tag History will be deleted. Shift reports are not deleted.")
-                .setNegativeButton("CANCEL",null).setPositiveButton("DELETE",(d,w)->{int n=db.clearHistory();toast(n+" tag(s) deleted");showHistory();}).show());
+        gap(8); outline(shiftStart>0?"กลับหน้าผลิต / BACK TO PRODUCTION":"กลับ / BACK",v->{if(shiftStart>0)showProductionAuto();else showStartShift();});
+        outline("ส่งออก CSV / EXPORT CSV",v->exportCsv());
+        danger("ล้างประวัติ / CLEAR HISTORY",v->new AlertDialog.Builder(this).setTitle("ล้างประวัติ TAG? / CLEAR TAG HISTORY?").setMessage("ประวัติ Tag ดิบที่ยืนยันทั้งหมดจะถูกลบ แต่รายงานกะจะไม่ถูกลบ / All confirmed raw Tag History will be deleted. Shift reports are not deleted.")
+                .setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("ลบ / DELETE",(d,w)->{int n=db.clearHistory();toast("ลบแล้ว "+n+" Tag / tag(s) deleted");showHistory();}).show());
     }
 
     private void exportCsv(){
         try{
             Uri uri=CsvExporter.export(this,db.list(10000));
-            toast("Saved in Downloads/MTS_Exports");
+            toast("บันทึกแล้วใน Downloads/MTS_Exports / Saved");
             Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/csv");share.putExtra(Intent.EXTRA_STREAM,uri);
-            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Share MTS CSV"));
-        }catch(Exception e){showError("EXPORT ERROR",e.getMessage()==null?e.toString():e.getMessage());}
+            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"แชร์ MTS CSV / Share MTS CSV"));
+        }catch(Exception e){showError("ส่งออกไม่สำเร็จ / EXPORT ERROR",e.getMessage()==null?e.toString():e.getMessage());}
     }
 
     private void updateTimer(){
         if(timerText==null)return;ProductionStore.Totals t=production.totals();
-        String state=production.stopRunning()?"STOP RUNNING: "+production.stopReason():"WORKING";
-        timerText.setText(state+"\nOK: "+t.ok+"   NG: "+t.ng+"\nWorking: "+duration(t.workingSec)+"   Stop: "+duration(t.stopSec));
+        String state=production.stopRunning()?"กำลังหยุด / STOP RUNNING: "+production.stopReason():"กำลังผลิต / WORKING";
+        timerText.setText(state+"\nOK: "+t.ok+"   NG: "+t.ng+"\nเวลาผลิต / Working: "+duration(t.workingSec)+"   เวลาหยุด / Stop: "+duration(t.stopSec));
         timerText.setTextColor(production.stopRunning()?RED:GREEN);
     }
 
     private void showAddNg(){
-        if(production.activeItem().isEmpty()){toast("Scan and Confirm a Production Tag first");return;}
-        LinearLayout form=dialogForm();EditText qty=numberInput("NG Qty");Spinner reason=spinner(config.ngReasons());
+        if(production.activeItem().isEmpty()){toast("กรุณาสแกนและยืนยัน Tag ผลิตก่อน / Scan and Confirm a Production Tag first");return;}
+        LinearLayout form=dialogForm();EditText qty=numberInput("จำนวน NG / NG Qty");Spinner reason=spinner(config.ngReasons());
         form.addView(qty);form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
-        new AlertDialog.Builder(this).setTitle("ADD NG — "+production.activeItem()+" / "+production.activeLot()).setView(form)
-                .setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM",(d,w)->{
-                    try{production.addNg(longValue(qty),String.valueOf(reason.getSelectedItem()),System.currentTimeMillis());toast("NG saved");showProductionAuto();}
-                    catch(Exception e){toast(e.getMessage()==null?"Cannot save NG":e.getMessage());}
+        new AlertDialog.Builder(this).setTitle("ลงงานเสีย / ADD NG — "+production.activeItem()+" / "+production.activeLot()).setView(form)
+                .setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("ยืนยัน / CONFIRM",(d,w)->{
+                    try{production.addNg(longValue(qty),String.valueOf(reason.getSelectedItem()),System.currentTimeMillis());toast("บันทึก NG แล้ว / NG saved");showProductionAuto();}
+                    catch(Exception e){toast(e.getMessage()==null?"บันทึก NG ไม่สำเร็จ / Cannot save NG":e.getMessage());}
                 }).show();
     }
 
     private void showStartStop(){
         Spinner reason=spinner(config.stopReasons());LinearLayout form=dialogForm();form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
-        new AlertDialog.Builder(this).setTitle("STOP M/C REASON").setView(form).setNegativeButton("CANCEL",null)
-                .setPositiveButton("CONFIRM",(d,w)->{String selected=String.valueOf(reason.getSelectedItem());
-                    if("NO OT".equalsIgnoreCase(selected)){production.markNoOt(System.currentTimeMillis());toast("บันทึก NO OT — ไม่เริ่ม Stop Timer");showProductionAuto();}
-                    else if("CHANGE BLADE".equalsIgnoreCase(selected)||"BLADE CHANGE".equalsIgnoreCase(selected))showBladeReason();
+        new AlertDialog.Builder(this).setTitle("สาเหตุหยุดเครื่อง / STOP M/C REASON").setView(form).setNegativeButton("ยกเลิก / CANCEL",null)
+                .setPositiveButton("ยืนยัน / CONFIRM",(d,w)->{String selected=String.valueOf(reason.getSelectedItem());
+                    if(selected.toUpperCase(Locale.US).contains("NO OT")){production.markNoOt(System.currentTimeMillis());toast("บันทึกไม่มี OT แล้ว — ไม่เริ่มเวลาหยุด / NO OT saved");showProductionAuto();}
+                    else if(selected.toUpperCase(Locale.US).contains("CHANGE BLADE")||selected.toUpperCase(Locale.US).contains("BLADE CHANGE"))showBladeReason();
                     else{production.startStop(selected,System.currentTimeMillis());showProductionAuto();}
                 }).show();
     }
 
     private void showBladeReason(){
-        Spinner reason=spinner(new String[]{"Tool Life Limit","Broken","Chipped","Abnormal Quality","Other"});LinearLayout form=dialogForm();labelFor(form,"เหตุผลที่เปลี่ยน Blade / Change Reason");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
-        new AlertDialog.Builder(this).setTitle("เปลี่ยนใบเลื่อย / CHANGE BLADE").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("SCAN NEW BLADE",(d,w)->{pendingBladeReason=String.valueOf(reason.getSelectedItem());scan(ScanTarget.BLADE,"Scan QR of new Blade");}).show();
+        Spinner reason=spinner(new String[]{"ครบอายุ Tool / Tool Life Limit","แตกหัก / Broken","บิ่น / Chipped","คุณภาพผิดปกติ / Abnormal Quality","อื่น ๆ / Other"});LinearLayout form=dialogForm();labelFor(form,"เหตุผลที่เปลี่ยน Blade / Change Reason");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
+        new AlertDialog.Builder(this).setTitle("เปลี่ยนใบเลื่อย / CHANGE BLADE").setView(form).setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("สแกน BLADE ใหม่ / SCAN NEW BLADE",(d,w)->{pendingBladeReason=String.valueOf(reason.getSelectedItem());scan(ScanTarget.BLADE,"สแกน QR Blade ใหม่ / Scan QR of new Blade");}).show();
     }
 
     private void showCloseShift(){
-        LinearLayout form=dialogForm();TextView active=new TextView(this);active.setText("Last Item: "+emptyDash(production.activeItem())+"\nLast Lot: "+emptyDash(production.activeLot()));active.setTextSize(16);active.setTextColor(NAVY);active.setPadding(0,0,0,dp(8));
+        LinearLayout form=dialogForm();TextView active=new TextView(this);active.setText("Item ล่าสุด / Last Item: "+emptyDash(production.activeItem())+"\nLot ล่าสุด / Last Lot: "+emptyDash(production.activeLot()));active.setTextSize(16);active.setTextColor(NAVY);active.setPadding(0,0,0,dp(8));
         EditText ok=numberInput("0"),ng=numberInput("0");Spinner ngReason=spinner(config.ngReasons());
-        Spinner coffee=spinner(new String[]{"SELECT","0 time","1 time","2 times"});Spinner meal=spinner(new String[]{"SELECT","NO BREAK","BREAK"});Spinner otBreak=spinner(new String[]{"SELECT","NO BREAK","BREAK"});
+        Spinner coffee=spinner(new String[]{"เลือก / SELECT","0 ครั้ง / 0 time","1 ครั้ง / 1 time","2 ครั้ง / 2 times"});Spinner meal=spinner(new String[]{"เลือก / SELECT","ไม่ได้พัก / NO BREAK","พัก / BREAK"});Spinner otBreak=spinner(new String[]{"เลือก / SELECT","ไม่ได้พัก / NO BREAK","พัก / BREAK"});
         if(production.noOt()){otBreak.setSelection(1);otBreak.setEnabled(false);}
-        form.addView(active);labelFor(form,"จำนวนงานดี Lot สุดท้าย (Last Lot OK)");form.addView(ok);labelFor(form,"จำนวนงานเสีย Lot สุดท้าย (Last Lot NG)");form.addView(ng);labelFor(form,"สาเหตุงานเสีย (NG Reason)");form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Coffee Break "+config.coffeeMinutes()+" min — select count");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Meal Break "+config.mealMinutes()+" min");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"OT Break "+config.otBreakMinutes()+" min");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(56)));
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("CLOSE SHIFT").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM CLOSE",null).create();
+        form.addView(active);labelFor(form,"จำนวนงานดี Lot สุดท้าย / Last Lot OK");form.addView(ok);labelFor(form,"จำนวนงานเสีย Lot สุดท้าย / Last Lot NG");form.addView(ng);labelFor(form,"สาเหตุงานเสีย / NG Reason");form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"พักกาแฟ / Coffee Break "+config.coffeeMinutes()+" นาที — เลือกจำนวนครั้ง");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"พักอาหาร / Meal Break "+config.mealMinutes()+" นาที");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"พัก OT / OT Break "+config.otBreakMinutes()+" นาที");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(56)));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("ปิดกะ / CLOSE SHIFT").setView(form).setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("ยืนยันปิดกะ / CONFIRM CLOSE",null).create();
         dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
-                boolean needOt=!production.noOt();if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||(needOt&&otBreak.getSelectedItemPosition()==0)){toast("BREAK CHECK REQUIRED — answer all red fields");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));if(needOt)otBreak.setBackgroundColor(Color.rgb(255,210,210));return;}
+                boolean needOt=!production.noOt();if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||(needOt&&otBreak.getSelectedItemPosition()==0)){toast("ต้องตอบข้อมูลการพักให้ครบทุกช่องสีแดง / BREAK CHECK REQUIRED");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));if(needOt)otBreak.setBackgroundColor(Color.rgb(255,210,210));return;}
                 long actual=System.currentTimeMillis(),scheduled=scheduledClose(shift,actual),effective=actual;String closeReason="";boolean early=actual<scheduled-config.closeEarlyTolerance()*60000L;
                 long lastOk=longValue(ok),lastNg=longValue(ng);int coffeeCount=coffee.getSelectedItemPosition()-1,mealTaken=meal.getSelectedItemPosition()==2?1:0,otTaken=needOt&&otBreak.getSelectedItemPosition()==2?1:0;
                 if(early){dialog.dismiss();requestCloseReason(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,coffeeCount,mealTaken,otTaken);return;}
                 if(Math.abs(actual-scheduled)<=config.closeEarlyTolerance()*60000L)effective=scheduled;
                 ProductionStore.Summary s=production.closeShift(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,closeReason,coffeeCount,mealTaken,otTaken,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());
                 dialog.dismiss();exportExcel(s,false);shiftStart=0;shiftId="";showSummary(s,true);
-            }catch(Exception e){toast(e.getMessage()==null?"Cannot close shift":e.getMessage());}
+            }catch(Exception e){toast(e.getMessage()==null?"ปิดกะไม่สำเร็จ / Cannot close shift":e.getMessage());}
         }));dialog.show();
     }
 
     private void showSummary(ProductionStore.Summary s,boolean closed){
-        makeScreen(closed?"MACHINE SHIFT SUMMARY — CLOSED":"MACHINE SHIFT SUMMARY");
+        makeScreen(closed?"สรุปกะเครื่องจักร — ปิดแล้ว / SHIFT SUMMARY — CLOSED":"สรุปกะเครื่องจักร / MACHINE SHIFT SUMMARY");
         label(s.machine+" • "+s.shift,20,NAVY,true);label(fmt(s.startMs)+" → "+fmt(s.closeMs),14,Color.DKGRAY,false);gap(10);
-        summaryCard("OK",s.ok,GREEN);summaryCard("NG",s.ng,RED);summaryCard("WORKING TIME",duration(s.workingSec),BLUE);summaryCard("STOP TIME",duration(s.stopSec),Color.rgb(198,94,0));summaryCard("OT",duration(s.otSec),Color.rgb(104,50,150));summaryCard("BREAK",duration(s.totalBreakSec),Color.rgb(0,110,120));
-        gap(8);outline("EXPORT EXCEL .XLSX",v->exportExcel(s,true));outline("EXPORT SHIFT CSV",v->exportShift(s.shiftId,true));
-        if(closed)action("START NEXT SHIFT",GREEN,v->{employee="";machine="";shift="DAY";showStartShift();});
-        else outline("BACK TO PRODUCTION",v->showProductionAuto());
+        summaryCard("งานดี / OK",s.ok,GREEN);summaryCard("งานเสีย / NG",s.ng,RED);summaryCard("เวลาผลิต / WORKING TIME",duration(s.workingSec),BLUE);summaryCard("เวลาหยุด / STOP TIME",duration(s.stopSec),Color.rgb(198,94,0));summaryCard("ล่วงเวลา / OT",duration(s.otSec),Color.rgb(104,50,150));summaryCard("เวลาพัก / BREAK",duration(s.totalBreakSec),Color.rgb(0,110,120));
+        gap(8);outline("ส่งออก EXCEL .XLSX / EXPORT EXCEL",v->exportExcel(s,true));outline("ส่งออก CSV กะ / EXPORT SHIFT CSV",v->exportShift(s.shiftId,true));
+        if(closed)action("เริ่มกะถัดไป / START NEXT SHIFT",GREEN,v->{employee="";machine="";shift="DAY";showStartShift();});
+        else outline("กลับหน้าผลิต / BACK TO PRODUCTION",v->showProductionAuto());
     }
 
     private void showToolLife(){
-        makeScreen("TOOL LIFE");label("CURRENT TOOL",18,NAVY,true);statusCard("Code / Type",production.toolCode()+" / "+production.toolType());summaryCard("LIFE QTY",production.toolLife(),GREEN);
-        action("INSTALL / CHANGE TOOL",BLUE,v->showInstallTool());outline("BACK TO PRODUCTION",v->showProductionAuto());
+        makeScreen("อายุ TOOL / TOOL LIFE");label("TOOL ปัจจุบัน / CURRENT TOOL",18,NAVY,true);statusCard("รหัส / ประเภท — Code / Type",production.toolCode()+" / "+production.toolType());summaryCard("จำนวนอายุใช้งาน / LIFE QTY",production.toolLife(),GREEN);
+        action("ติดตั้ง / เปลี่ยน TOOL — INSTALL / CHANGE",BLUE,v->showInstallTool());outline("กลับหน้าผลิต / BACK TO PRODUCTION",v->showProductionAuto());
     }
 
     private void showInstallTool(){
-        LinearLayout form=dialogForm();EditText code=textInput("Tool Code");Spinner type=spinner(new String[]{"SAW","CHIP","DIE"});form.addView(code);form.addView(type,new LinearLayout.LayoutParams(-1,dp(56)));
-        new AlertDialog.Builder(this).setTitle("INSTALL NEW TOOL").setMessage("New Tool Life will reset to 0.").setView(form).setNegativeButton("CANCEL",null)
-                .setPositiveButton("INSTALL",(d,w)->{if(code.getText().toString().trim().isEmpty()){toast("Tool Code is required");return;}production.installTool(code.getText().toString(),String.valueOf(type.getSelectedItem()));showToolLife();}).show();
+        LinearLayout form=dialogForm();EditText code=textInput("รหัส Tool / Tool Code");Spinner type=spinner(new String[]{"ใบเลื่อย / SAW","Chip / CHIP","แม่พิมพ์ / DIE"});form.addView(code);form.addView(type,new LinearLayout.LayoutParams(-1,dp(56)));
+        new AlertDialog.Builder(this).setTitle("ติดตั้ง TOOL ใหม่ / INSTALL NEW TOOL").setMessage("อายุ Tool ใหม่จะเริ่มที่ 0 / New Tool Life will reset to 0.").setView(form).setNegativeButton("ยกเลิก / CANCEL",null)
+                .setPositiveButton("ติดตั้ง / INSTALL",(d,w)->{if(code.getText().toString().trim().isEmpty()){toast("กรุณาระบุรหัส Tool / Tool Code is required");return;}production.installTool(code.getText().toString(),String.valueOf(type.getSelectedItem()));showToolLife();}).show();
     }
 
     private void exportShift(String id,boolean share){
-        try{Uri uri=CsvExporter.exportShiftReport(this,id,production.reportRows(id));toast("Shift Report saved in Downloads/MTS_Exports");
-            if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/csv");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share MTS Shift Report"));}
-        }catch(Exception e){toast(e.getMessage()==null?"Export failed":e.getMessage());}
+        try{Uri uri=CsvExporter.exportShiftReport(this,id,production.reportRows(id));toast("บันทึกรายงานกะแล้วใน Downloads/MTS_Exports / Shift Report saved");
+            if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/csv");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"แชร์รายงานกะ MTS / Share MTS Shift Report"));}
+        }catch(Exception e){toast(e.getMessage()==null?"ส่งออกไม่สำเร็จ / Export failed":e.getMessage());}
     }
 
     private void exportExcel(ProductionStore.Summary s,boolean share){
-        try{Uri uri=XlsxExporter.export(this,s,db.list(10000),production.reportRows(s.shiftId));toast("Excel saved: Downloads/MTS_Exports");
-            if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share MTS Excel"));}
-        }catch(Exception e){toast("Excel Export Error: "+(e.getMessage()==null?e.toString():e.getMessage()));}
+        try{Uri uri=XlsxExporter.export(this,s,db.list(10000),production.reportRows(s.shiftId));toast("บันทึก Excel แล้วใน Downloads/MTS_Exports / Excel saved");
+            if(share){Intent i=new Intent(Intent.ACTION_SEND);i.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");i.putExtra(Intent.EXTRA_STREAM,uri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"แชร์ MTS Excel / Share MTS Excel"));}
+        }catch(Exception e){toast("ส่งออก Excel ไม่สำเร็จ / Excel Export Error: "+(e.getMessage()==null?e.toString():e.getMessage()));}
     }
 
     private void confirmStartShift(){
         long actual=System.currentTimeMillis(),scheduled=scheduledStart(shift,actual),diff=Math.abs(actual-scheduled),tol=config.startTolerance()*60000L;
-        if(diff>tol){Spinner reason=spinner(config.startReasons());LinearLayout form=dialogForm();labelFor(form,"Start outside standard time. Reason required");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
-            new AlertDialog.Builder(this).setTitle("START SHIFT REASON").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("START",(d,w)->startShiftNow(actual,actual,String.valueOf(reason.getSelectedItem()))).show();
+        if(diff>tol){Spinner reason=spinner(config.startReasons());LinearLayout form=dialogForm();labelFor(form,"เริ่มนอกเวลามาตรฐาน ต้องระบุสาเหตุ / Start outside standard time. Reason required");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
+            new AlertDialog.Builder(this).setTitle("สาเหตุเริ่มกะ / START SHIFT REASON").setView(form).setNegativeButton("ยกเลิก / CANCEL",null).setPositiveButton("เริ่มกะ / START",(d,w)->startShiftNow(actual,actual,String.valueOf(reason.getSelectedItem()))).show();
         }else startShiftNow(actual,scheduled,"");
     }
     private void startShiftNow(long actual,long effective,String reason){shiftStart=effective;production.startShift(shift,employee,machine,actual,effective,reason);shiftId=production.shiftId();showProductionAuto();}
 
     private void requestCloseReason(long ok,long ng,String ngReason,long actual,long effective,int coffee,int meal,int otBreak){
-        Spinner reason=spinner(config.closeReasons());LinearLayout form=dialogForm();labelFor(form,"Closing more than "+config.closeEarlyTolerance()+" minutes early. Reason required");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
-        new AlertDialog.Builder(this).setTitle("CLOSE SHIFT REASON").setView(form).setNegativeButton("BACK",null).setPositiveButton("CONFIRM CLOSE",(d,w)->{
+        Spinner reason=spinner(config.closeReasons());LinearLayout form=dialogForm();labelFor(form,"ปิดก่อนเวลาเกิน "+config.closeEarlyTolerance()+" นาที ต้องระบุสาเหตุ / Closing early. Reason required");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(56)));
+        new AlertDialog.Builder(this).setTitle("สาเหตุปิดกะ / CLOSE SHIFT REASON").setView(form).setNegativeButton("กลับ / BACK",null).setPositiveButton("ยืนยันปิดกะ / CONFIRM CLOSE",(d,w)->{
             ProductionStore.Summary s=production.closeShift(ok,ng,ngReason,actual,effective,String.valueOf(reason.getSelectedItem()),coffee,meal,otBreak,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());exportExcel(s,false);shiftStart=0;shiftId="";showSummary(s,true);
         }).show();
     }
@@ -305,12 +305,12 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showManagement(){
-        makeScreen("MANAGEMENT SETTINGS");label("SHIFT TIME (HH:mm)",19,NAVY,true);
-        EditText ds=textValue("DAY Start",config.dayStart()),dc=textValue("DAY Close",config.dayClose()),ns=textValue("NIGHT Start",config.nightStart()),nc=textValue("NIGHT Close",config.nightClose());body.addView(ds);body.addView(dc);body.addView(ns);body.addView(nc);
-        label("RULES / BREAK MINUTES",19,NAVY,true);EditText st=numberValue("Start tolerance",config.startTolerance()),ct=numberValue("Close early tolerance",config.closeEarlyTolerance()),cf=numberValue("Coffee",config.coffeeMinutes()),ml=numberValue("Meal",config.mealMinutes()),ot=numberValue("OT Break",config.otBreakMinutes());body.addView(st);body.addView(ct);body.addView(cf);body.addView(ml);body.addView(ot);
-        label("REASONS — separate with comma",19,NAVY,true);EditText ngr=textValue("NG Reasons",String.join(",",config.ngReasons())),spr=textValue("Stop Reasons",String.join(",",config.stopReasons())),str=textValue("Start Reasons",String.join(",",config.startReasons())),clr=textValue("Close Reasons",String.join(",",config.closeReasons()));ngr.setMinLines(3);spr.setMinLines(3);body.addView(ngr);body.addView(spr);body.addView(str);body.addView(clr);
-        action("SAVE SETTINGS",GREEN,v->{config.save(ds.getText().toString(),dc.getText().toString(),ns.getText().toString(),nc.getText().toString(),(int)longValue(st),(int)longValue(ct),(int)longValue(cf),(int)longValue(ml),(int)longValue(ot),ngr.getText().toString(),spr.getText().toString(),str.getText().toString(),clr.getText().toString());toast("Management settings saved");if(production.hasActiveShift())showProductionAuto();else showStartShift();});
-        outline("CANCEL",v->{if(production.hasActiveShift())showProductionAuto();else showStartShift();});
+        makeScreen("ตั้งค่าระบบ / MANAGEMENT SETTINGS");label("เวลากะ / SHIFT TIME (HH:mm)",19,NAVY,true);
+        EditText ds=textValue("เริ่มกะ DAY / DAY Start",config.dayStart()),dc=textValue("ปิดกะ DAY / DAY Close",config.dayClose()),ns=textValue("เริ่มกะ NIGHT / NIGHT Start",config.nightStart()),nc=textValue("ปิดกะ NIGHT / NIGHT Close",config.nightClose());body.addView(ds);body.addView(dc);body.addView(ns);body.addView(nc);
+        label("กฎและเวลาพัก / RULES & BREAK MINUTES",19,NAVY,true);EditText st=numberValue("ช่วงยอมรับเวลาเริ่ม / Start tolerance",config.startTolerance()),ct=numberValue("ช่วงยอมรับปิดก่อน / Close early tolerance",config.closeEarlyTolerance()),cf=numberValue("พักกาแฟ / Coffee",config.coffeeMinutes()),ml=numberValue("พักอาหาร / Meal",config.mealMinutes()),ot=numberValue("พัก OT / OT Break",config.otBreakMinutes());body.addView(st);body.addView(ct);body.addView(cf);body.addView(ml);body.addView(ot);
+        label("รายการสาเหตุ — คั่นด้วยจุลภาค / REASONS — comma separated",19,NAVY,true);EditText ngr=textValue("สาเหตุ NG / NG Reasons",String.join(",",config.ngReasons())),spr=textValue("สาเหตุหยุด / Stop Reasons",String.join(",",config.stopReasons())),str=textValue("สาเหตุเริ่มกะ / Start Reasons",String.join(",",config.startReasons())),clr=textValue("สาเหตุปิดกะ / Close Reasons",String.join(",",config.closeReasons()));ngr.setMinLines(3);spr.setMinLines(3);body.addView(ngr);body.addView(spr);body.addView(str);body.addView(clr);
+        action("บันทึกการตั้งค่า / SAVE SETTINGS",GREEN,v->{config.save(ds.getText().toString(),dc.getText().toString(),ns.getText().toString(),nc.getText().toString(),(int)longValue(st),(int)longValue(ct),(int)longValue(cf),(int)longValue(ml),(int)longValue(ot),ngr.getText().toString(),spr.getText().toString(),str.getText().toString(),clr.getText().toString());toast("บันทึกการตั้งค่าแล้ว / Management settings saved");if(production.hasActiveShift())showProductionAuto();else showStartShift();});
+        outline("ยกเลิก / CANCEL",v->{if(production.hasActiveShift())showProductionAuto();else showStartShift();});
     }
 
     private EditText textValue(String hint,String value){EditText e=textInput(hint);e.setHint(hint);e.setText(value);return e;}
@@ -336,8 +336,8 @@ public final class MainActivity extends AppCompatActivity {
         return raw;
     }
     private void showError(String title,String msg){new AlertDialog.Builder(this).setTitle(title).setMessage(msg)
-            .setPositiveButton("SCAN AGAIN",(d,w)->scan(ScanTarget.TAG,"Scan WIP or FG Result Tag"))
-            .setNegativeButton("CANCEL",(d,w)->showProductionAuto()).show();}
+            .setPositiveButton("สแกนอีกครั้ง / SCAN AGAIN",(d,w)->scan(ScanTarget.TAG,"สแกน TAG ผลิต WIP หรือ FG / Scan WIP or FG Result Tag"))
+            .setNegativeButton("ยกเลิก / CANCEL",(d,w)->showProductionAuto()).show();}
     private void statusCard(String title,String value){
         TextView t=new TextView(this);t.setText(title+"\n"+value);t.setTextSize(17);t.setTextColor(NAVY);t.setPadding(dp(16),dp(12),dp(16),dp(12));
         t.setBackgroundColor(WHITE);t.setTypeface(null,1);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(6));body.addView(t,lp);

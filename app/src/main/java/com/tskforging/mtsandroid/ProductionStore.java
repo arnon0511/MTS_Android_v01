@@ -104,7 +104,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
     public long parsedTagQty(String value){return parseQty(value);}
 
     public void addNg(long qty,String reason,long now){
-        if(qty<=0)throw new IllegalArgumentException("NG Qty must be greater than zero");
+        if(qty<=0)throw new IllegalArgumentException("จำนวน NG ต้องมากกว่า 0 / NG Qty must be greater than zero");
         ContentValues v=new ContentValues();v.put("shift_id",shiftId());v.put("item",activeItem());v.put("lot",activeLot());v.put("qty",qty);v.put("reason",reason);v.put("event_ms",now);
         getWritableDatabase().insertOrThrow("ng_events",null,v);
     }
@@ -137,14 +137,14 @@ public final class ProductionStore extends SQLiteOpenHelper {
     public Summary closeShift(long lastOk,long lastNg,String ngReason,long actualClose,long effectiveClose,String closeReason,int coffeeCount,int mealTaken,int otBreakTaken,int coffeeMin,int mealMin,int otBreakMin){
         if(stopRunning())endStop(actualClose);
         String item=activeItem(),lot=activeLot(),id=shiftId();
-        if((lastOk>0||lastNg>0)&&(item.isEmpty()||lot.isEmpty()))throw new IllegalStateException("Scan a Tag before entering Last Lot Qty");
+        if((lastOk>0||lastNg>0)&&(item.isEmpty()||lot.isEmpty()))throw new IllegalStateException("กรุณาสแกน Tag ก่อนระบุจำนวน Lot สุดท้าย / Scan a Tag before entering Last Lot Qty");
         if(lastOk>0){
             ContentValues v=new ContentValues();v.put("shift_id",id);v.put("process","LAST LOT");v.put("item",item);v.put("lot",lot);v.put("tag_qty",lastOk);v.put("previous_qty",0);v.put("this_qty",lastOk);v.put("raw_qr","");v.put("confirmed_at",actualClose);
             getWritableDatabase().insertOrThrow("lots",null,v);
             ContentValues c=new ContentValues();c.put("item",item);c.put("lot",lot);c.put("previous_ok",lastOk);c.put("updated_ms",actualClose);
             getWritableDatabase().insertWithOnConflict("carryover",null,c,SQLiteDatabase.CONFLICT_REPLACE);addToolLife(lastOk);
         }
-        if(lastNg>0){if(ngReason==null||ngReason.trim().isEmpty())throw new IllegalArgumentException("NG Reason is required");addNg(lastNg,ngReason,actualClose);}
+        if(lastNg>0){if(ngReason==null||ngReason.trim().isEmpty())throw new IllegalArgumentException("กรุณาระบุสาเหตุ NG / NG Reason is required");addNg(lastNg,ngReason,actualClose);}
         long breakSec=(long)Math.max(0,coffeeCount)*coffeeMin*60L+(mealTaken==1?mealMin*60L:0)+(otBreakTaken==1?otBreakMin*60L:0);
         long otSec=noOt()?0:Math.max(0,(effectiveClose-startMs())/1000-9*3600L);
         ContentValues u=new ContentValues();u.put("close_ms",effectiveClose);u.put("actual_close_ms",actualClose);u.put("close_reason",closeReason);u.put("coffee_count",coffeeCount);u.put("meal_taken",mealTaken);u.put("ot_break_taken",otBreakTaken);u.put("total_break_sec",breakSec);u.put("ot_sec",otSec);u.put("status","CLOSED");getWritableDatabase().update("shifts",u,"id=?",new String[]{id});
@@ -168,11 +168,11 @@ public final class ProductionStore extends SQLiteOpenHelper {
     private void saveLastSummary(Summary s){prefs.edit().putString("lastShiftId",s.shiftId).apply();}
 
     public long toolLife(){return prefs.getLong("toolLife",0);}
-    public String toolCode(){return prefs.getString("toolCode","NOT SET");}
+    public String toolCode(){return prefs.getString("toolCode","ยังไม่ตั้งค่า / NOT SET");}
     public String toolType(){return prefs.getString("toolType","SAW");}
     public void installTool(String code,String type){prefs.edit().putString("toolCode",code.trim()).putString("toolType",type.trim()).putLong("toolLife",0).apply();}
     public void changeBlade(String newCode,String reason,long now){
-        if(newCode==null||newCode.trim().isEmpty())throw new IllegalArgumentException("Blade QR is required");
+        if(newCode==null||newCode.trim().isEmpty())throw new IllegalArgumentException("กรุณาสแกน QR Blade / Blade QR is required");
         ContentValues v=new ContentValues();v.put("shift_id",shiftId());v.put("machine",machine());v.put("old_tool",toolCode());v.put("new_tool",newCode.trim());v.put("old_life",toolLife());v.put("reason",reason);v.put("event_ms",now);getWritableDatabase().insertOrThrow("tool_events",null,v);
         installTool(newCode,"BLADE");
     }
