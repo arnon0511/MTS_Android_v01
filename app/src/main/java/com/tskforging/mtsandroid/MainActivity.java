@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Locale;
 
 public final class MainActivity extends AppCompatActivity {
-    private enum ScanTarget { EMPLOYEE, MACHINE, TAG }
+    private enum ScanTarget { EMPLOYEE, MACHINE, TAG, BLADE }
     private final int NAVY=Color.rgb(15,43,70), BLUE=Color.rgb(0,82,155), GREEN=Color.rgb(0,112,60);
     private final int RED=Color.rgb(190,25,35), WHITE=Color.WHITE, PALE=Color.rgb(245,248,252);
     private LinearLayout body;
@@ -46,6 +46,7 @@ public final class MainActivity extends AppCompatActivity {
     private String employee="", machine="", shift="DAY", shiftId="";
     private long shiftStart=0;
     private TagParser.ResultTag pendingTag;
+    private String pendingBladeReason="";
     private TextView timerText;
     private boolean productionScreen=false;
     private final Handler timerHandler=new Handler(Looper.getMainLooper());
@@ -77,7 +78,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showStartShift() {
-        makeScreen("MTS Android v1.0 FULL TEST");
+        makeScreen("MTS Android v1.1 MATERIAL & TOOL TEST");
         label("MANUFACTURING TRACEABILITY",26,NAVY,true);
         label("Offline Test Build • Galaxy S25 Ultra",15,Color.DKGRAY,false);
         gap(20);
@@ -98,6 +99,7 @@ public final class MainActivity extends AppCompatActivity {
         });
         gap(10); outline("LOGIC TEST MODE",v->startActivity(new Intent(this,LogicTestActivity.class)));
         outline("TAG HISTORY",v->showHistory());
+        outline("ตรวจสอบวัตถุดิบ / MATERIAL VERIFICATION",v->startActivity(new Intent(this,MaterialVerificationActivity.class)));
         outline("MANAGEMENT SETTINGS",v->showManagement());
         ProductionStore.Summary last=production.lastSummary();
         if(!last.shiftId.isEmpty())outline("LAST MACHINE SHIFT SUMMARY",v->showSummary(last,true));
@@ -111,16 +113,16 @@ public final class MainActivity extends AppCompatActivity {
         timerText=new TextView(this);timerText.setTextSize(18);timerText.setTextColor(NAVY);timerText.setTypeface(null,1);timerText.setPadding(dp(16),dp(13),dp(16),dp(13));timerText.setBackgroundColor(WHITE);
         LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,-2);tlp.setMargins(0,dp(6),0,dp(6));body.addView(timerText,tlp);updateTimer();timerHandler.postDelayed(timerTick,1000);
         gap(12);
-        action("SCAN PRODUCTION TAG",BLUE,v->scan(ScanTarget.TAG,"Scan WIP or FG Result Tag"));
-        action("ADD NG",Color.rgb(198,94,0),v->showAddNg());
+        action("สแกน TAG ผลิต / SCAN PRODUCTION TAG",BLUE,v->scan(ScanTarget.TAG,"Scan WIP or FG Result Tag"));
+        action("ลงงานเสีย / ADD NG",Color.rgb(198,94,0),v->showAddNg());
         if(production.stopRunning())danger("END STOP — "+production.stopReason(),v->{production.endStop(System.currentTimeMillis());toast("Stop Time saved");showProductionAuto();});
-        else action("STOP M/C",Color.rgb(198,94,0),v->showStartStop());
-        gap(8);outline("MACHINE SHIFT SUMMARY",v->showSummary(production.summary(shiftId),false));
-        outline("TOOL LIFE",v->showToolLife());
-        outline("TAG HISTORY",v->showHistory());
+        else action("หยุดเครื่อง / STOP M/C",Color.rgb(198,94,0),v->showStartStop());
+        gap(8);outline("สรุปผลกะ / MACHINE SHIFT SUMMARY",v->showSummary(production.summary(shiftId),false));
+        outline("อายุ TOOL / TOOL LIFE",v->showToolLife());
+        outline("ประวัติ TAG / TAG HISTORY",v->showHistory());
         outline("EXPORT TAG HISTORY CSV",v->exportCsv());
         outline("MANAGEMENT SETTINGS",v->showManagement());
-        gap(22);danger("CLOSE SHIFT",v->showCloseShift());
+        gap(22);danger("ปิดกะ / CLOSE SHIFT",v->showCloseShift());
     }
 
     private void onScanResult(ScanIntentResult result) {
@@ -128,6 +130,11 @@ public final class MainActivity extends AppCompatActivity {
         String raw=result.getContents().trim();
         if(scanTarget==ScanTarget.EMPLOYEE){employee=readIdentity(raw,"EMP");showStartShift();return;}
         if(scanTarget==ScanTarget.MACHINE){machine=readIdentity(raw,"MC");showStartShift();return;}
+        if(scanTarget==ScanTarget.BLADE){
+            try{production.changeBlade(readIdentity(raw,"BLADE"),pendingBladeReason,System.currentTimeMillis());pendingBladeReason="";toast("ติดตั้ง Blade ใหม่และ Reset Tool Life แล้ว");showToolLife();}
+            catch(Exception e){toast(e.getMessage()==null?"Cannot save Blade":e.getMessage());}
+            return;
+        }
         pendingTag=TagParser.parse(raw);
         if(!pendingTag.isValid()){showError("UNKNOWN TAG", "Expected WIP 13 fields or FG 14 fields.\n\nRAW:\n"+raw);return;}
         if(db.isDuplicate(pendingTag.duplicateKey())){
@@ -210,20 +217,30 @@ public final class MainActivity extends AppCompatActivity {
     private void showStartStop(){
         Spinner reason=spinner(config.stopReasons());LinearLayout form=dialogForm();form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
         new AlertDialog.Builder(this).setTitle("STOP M/C REASON").setView(form).setNegativeButton("CANCEL",null)
-                .setPositiveButton("START TIMER",(d,w)->{production.startStop(String.valueOf(reason.getSelectedItem()),System.currentTimeMillis());showProductionAuto();}).show();
+                .setPositiveButton("CONFIRM",(d,w)->{String selected=String.valueOf(reason.getSelectedItem());
+                    if("NO OT".equalsIgnoreCase(selected)){production.markNoOt(System.currentTimeMillis());toast("บันทึก NO OT — ไม่เริ่ม Stop Timer");showProductionAuto();}
+                    else if("CHANGE BLADE".equalsIgnoreCase(selected)||"BLADE CHANGE".equalsIgnoreCase(selected))showBladeReason();
+                    else{production.startStop(selected,System.currentTimeMillis());showProductionAuto();}
+                }).show();
+    }
+
+    private void showBladeReason(){
+        Spinner reason=spinner(new String[]{"Tool Life Limit","Broken","Chipped","Abnormal Quality","Other"});LinearLayout form=dialogForm();labelFor(form,"เหตุผลที่เปลี่ยน Blade / Change Reason");form.addView(reason,new LinearLayout.LayoutParams(-1,dp(58)));
+        new AlertDialog.Builder(this).setTitle("เปลี่ยนใบเลื่อย / CHANGE BLADE").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("SCAN NEW BLADE",(d,w)->{pendingBladeReason=String.valueOf(reason.getSelectedItem());scan(ScanTarget.BLADE,"Scan QR of new Blade");}).show();
     }
 
     private void showCloseShift(){
         LinearLayout form=dialogForm();TextView active=new TextView(this);active.setText("Last Item: "+emptyDash(production.activeItem())+"\nLast Lot: "+emptyDash(production.activeLot()));active.setTextSize(16);active.setTextColor(NAVY);active.setPadding(0,0,0,dp(8));
-        EditText ok=numberInput("Last Lot OK (0 if none)"),ng=numberInput("Last Lot NG (0 if none)");Spinner ngReason=spinner(config.ngReasons());
+        EditText ok=numberInput("0"),ng=numberInput("0");Spinner ngReason=spinner(config.ngReasons());
         Spinner coffee=spinner(new String[]{"SELECT","0 time","1 time","2 times"});Spinner meal=spinner(new String[]{"SELECT","NO BREAK","BREAK"});Spinner otBreak=spinner(new String[]{"SELECT","NO BREAK","BREAK"});
-        form.addView(active);form.addView(ok);form.addView(ng);form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Coffee Break "+config.coffeeMinutes()+" min — select count");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Meal Break "+config.mealMinutes()+" min");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"OT Break "+config.otBreakMinutes()+" min");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(56)));
+        if(production.noOt()){otBreak.setSelection(1);otBreak.setEnabled(false);}
+        form.addView(active);labelFor(form,"จำนวนงานดี Lot สุดท้าย (Last Lot OK)");form.addView(ok);labelFor(form,"จำนวนงานเสีย Lot สุดท้าย (Last Lot NG)");form.addView(ng);labelFor(form,"สาเหตุงานเสีย (NG Reason)");form.addView(ngReason,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Coffee Break "+config.coffeeMinutes()+" min — select count");form.addView(coffee,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"Meal Break "+config.mealMinutes()+" min");form.addView(meal,new LinearLayout.LayoutParams(-1,dp(56)));labelFor(form,"OT Break "+config.otBreakMinutes()+" min");form.addView(otBreak,new LinearLayout.LayoutParams(-1,dp(56)));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("CLOSE SHIFT").setView(form).setNegativeButton("CANCEL",null).setPositiveButton("CONFIRM CLOSE",null).create();
         dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
-                if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||otBreak.getSelectedItemPosition()==0){toast("BREAK CHECK REQUIRED — answer all red fields");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));otBreak.setBackgroundColor(Color.rgb(255,210,210));return;}
+                boolean needOt=!production.noOt();if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||(needOt&&otBreak.getSelectedItemPosition()==0)){toast("BREAK CHECK REQUIRED — answer all red fields");coffee.setBackgroundColor(Color.rgb(255,210,210));meal.setBackgroundColor(Color.rgb(255,210,210));if(needOt)otBreak.setBackgroundColor(Color.rgb(255,210,210));return;}
                 long actual=System.currentTimeMillis(),scheduled=scheduledClose(shift,actual),effective=actual;String closeReason="";boolean early=actual<scheduled-config.closeEarlyTolerance()*60000L;
-                long lastOk=longValue(ok),lastNg=longValue(ng);int coffeeCount=coffee.getSelectedItemPosition()-1,mealTaken=meal.getSelectedItemPosition()==2?1:0,otTaken=otBreak.getSelectedItemPosition()==2?1:0;
+                long lastOk=longValue(ok),lastNg=longValue(ng);int coffeeCount=coffee.getSelectedItemPosition()-1,mealTaken=meal.getSelectedItemPosition()==2?1:0,otTaken=needOt&&otBreak.getSelectedItemPosition()==2?1:0;
                 if(early){dialog.dismiss();requestCloseReason(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,coffeeCount,mealTaken,otTaken);return;}
                 if(Math.abs(actual-scheduled)<=config.closeEarlyTolerance()*60000L)effective=scheduled;
                 ProductionStore.Summary s=production.closeShift(lastOk,lastNg,lastNg>0?String.valueOf(ngReason.getSelectedItem()):"",actual,effective,closeReason,coffeeCount,mealTaken,otTaken,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());

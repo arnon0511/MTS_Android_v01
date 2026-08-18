@@ -10,7 +10,7 @@ import java.util.List;
 public final class ConfigStore {
     private final SharedPreferences p;
     private static final String DEFAULT_NG="Burr|Dent/Scratch|Dimension|Setting|Mat.Defect|Weight|Run-Out|Perpendicularity|Other";
-    private static final String DEFAULT_STOP="Change Item|NO OT|5S|WAIT RAW MATERIAL|Training|No Worker|SET-UP|Machine Trouble|Blade Change|Other";
+    private static final String DEFAULT_STOP="Change Item|NO OT|5S|WAIT RAW MATERIAL|Training|No Worker|SET-UP|Machine Trouble|Change Blade|Other";
     private static final String DEFAULT_SHIFT="No Plan|5S|Other";
     private static final String DEFAULT_CLOSE="No Plan|OT Finish|Other";
 

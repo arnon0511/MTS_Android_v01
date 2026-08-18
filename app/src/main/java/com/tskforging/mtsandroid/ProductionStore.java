@@ -29,7 +29,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
     private final SharedPreferences prefs;
 
     public ProductionStore(Context context){
-        super(context,"mts_production.db",null,2);
+        super(context,"mts_production.db",null,3);
         prefs=context.getSharedPreferences("mts_production_state",Context.MODE_PRIVATE);
     }
 
@@ -39,6 +39,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE ng_events(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,item TEXT,lot TEXT,qty INTEGER,reason TEXT,event_ms INTEGER)");
         db.execSQL("CREATE TABLE stop_events(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,reason TEXT,start_ms INTEGER,end_ms INTEGER,duration_sec INTEGER)");
         db.execSQL("CREATE TABLE carryover(item TEXT PRIMARY KEY,lot TEXT,previous_ok INTEGER,updated_ms INTEGER)");
+        db.execSQL("CREATE TABLE tool_events(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,machine TEXT,old_tool TEXT,new_tool TEXT,old_life INTEGER,reason TEXT,event_ms INTEGER)");
         db.execSQL("CREATE INDEX idx_lots_shift ON lots(shift_id)");
         db.execSQL("CREATE INDEX idx_ng_shift ON ng_events(shift_id)");
         db.execSQL("CREATE INDEX idx_stop_shift ON stop_events(shift_id)");
@@ -48,6 +49,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
             String[] sql={"ALTER TABLE shifts ADD COLUMN actual_start_ms INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN actual_close_ms INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN start_reason TEXT DEFAULT ''","ALTER TABLE shifts ADD COLUMN close_reason TEXT DEFAULT ''","ALTER TABLE shifts ADD COLUMN coffee_count INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN meal_taken INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN ot_break_taken INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN total_break_sec INTEGER DEFAULT 0","ALTER TABLE shifts ADD COLUMN ot_sec INTEGER DEFAULT 0"};
             for(String q:sql)db.execSQL(q);
         }
+        if(oldVersion<3)db.execSQL("CREATE TABLE IF NOT EXISTS tool_events(id INTEGER PRIMARY KEY AUTOINCREMENT,shift_id TEXT,machine TEXT,old_tool TEXT,new_tool TEXT,old_life INTEGER,reason TEXT,event_ms INTEGER)");
     }
 
     public boolean hasActiveShift(){return prefs.getBoolean("active",false);}
@@ -68,7 +70,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
         v.put("start_ms",effective);v.put("actual_start_ms",actual);v.put("close_ms",0);v.put("actual_close_ms",0);v.put("start_reason",reason);v.put("status","OPEN");getWritableDatabase().insertOrThrow("shifts",null,v);
         prefs.edit().putBoolean("active",true).putString("shiftId",id).putString("shiftName",shift).putString("employee",employee)
                 .putString("machine",machine).putLong("startMs",effective).putLong("actualStartMs",actual).putString("activeItem","").putString("activeLot","")
-                .putLong("stopStart",0).putString("stopReason","").apply();
+                .putLong("stopStart",0).putString("stopReason","").putBoolean("noOt",false).apply();
     }
 
     public void startShift(String shift,String employee,String machine,long now){startShift(shift,employee,machine,now,now,"");}
@@ -111,6 +113,11 @@ public final class ProductionStore extends SQLiteOpenHelper {
         if(stopRunning())return;
         prefs.edit().putLong("stopStart",now).putString("stopReason",reason).apply();
     }
+    public boolean noOt(){return prefs.getBoolean("noOt",false);}
+    public void markNoOt(long now){
+        ContentValues v=new ContentValues();v.put("shift_id",shiftId());v.put("reason","NO OT");v.put("start_ms",now);v.put("end_ms",now);v.put("duration_sec",0);getWritableDatabase().insertOrThrow("stop_events",null,v);
+        prefs.edit().putBoolean("noOt",true).apply();
+    }
     public void endStop(long now){
         long start=stopStart();if(start<=0)return;
         ContentValues v=new ContentValues();v.put("shift_id",shiftId());v.put("reason",stopReason());v.put("start_ms",start);v.put("end_ms",now);v.put("duration_sec",Math.max(0,(now-start)/1000));
@@ -139,7 +146,7 @@ public final class ProductionStore extends SQLiteOpenHelper {
         }
         if(lastNg>0){if(ngReason==null||ngReason.trim().isEmpty())throw new IllegalArgumentException("NG Reason is required");addNg(lastNg,ngReason,actualClose);}
         long breakSec=(long)Math.max(0,coffeeCount)*coffeeMin*60L+(mealTaken==1?mealMin*60L:0)+(otBreakTaken==1?otBreakMin*60L:0);
-        long otSec=Math.max(0,(effectiveClose-startMs())/1000-9*3600L);
+        long otSec=noOt()?0:Math.max(0,(effectiveClose-startMs())/1000-9*3600L);
         ContentValues u=new ContentValues();u.put("close_ms",effectiveClose);u.put("actual_close_ms",actualClose);u.put("close_reason",closeReason);u.put("coffee_count",coffeeCount);u.put("meal_taken",mealTaken);u.put("ot_break_taken",otBreakTaken);u.put("total_break_sec",breakSec);u.put("ot_sec",otSec);u.put("status","CLOSED");getWritableDatabase().update("shifts",u,"id=?",new String[]{id});
         Summary s=summary(id);saveLastSummary(s);prefs.edit().putBoolean("active",false).putLong("stopStart",0).apply();return s;
     }
@@ -164,6 +171,11 @@ public final class ProductionStore extends SQLiteOpenHelper {
     public String toolCode(){return prefs.getString("toolCode","NOT SET");}
     public String toolType(){return prefs.getString("toolType","SAW");}
     public void installTool(String code,String type){prefs.edit().putString("toolCode",code.trim()).putString("toolType",type.trim()).putLong("toolLife",0).apply();}
+    public void changeBlade(String newCode,String reason,long now){
+        if(newCode==null||newCode.trim().isEmpty())throw new IllegalArgumentException("Blade QR is required");
+        ContentValues v=new ContentValues();v.put("shift_id",shiftId());v.put("machine",machine());v.put("old_tool",toolCode());v.put("new_tool",newCode.trim());v.put("old_life",toolLife());v.put("reason",reason);v.put("event_ms",now);getWritableDatabase().insertOrThrow("tool_events",null,v);
+        installTool(newCode,"BLADE");
+    }
     private void addToolLife(long qty){prefs.edit().putLong("toolLife",toolLife()+Math.max(0,qty)).apply();}
 
     public List<String[]> reportRows(String id){
@@ -177,6 +189,9 @@ public final class ProductionStore extends SQLiteOpenHelper {
         }
         try(Cursor c=getReadableDatabase().rawQuery("SELECT start_ms,reason,duration_sec FROM stop_events WHERE shift_id=? ORDER BY start_ms",new String[]{id})){
             while(c.moveToNext())rows.add(new String[]{"STOP",fmt(c.getLong(0)),id,base,"","","","",c.getString(1),String.valueOf(c.getLong(2)),""});
+        }
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT event_ms,old_tool,new_tool,old_life,reason FROM tool_events WHERE shift_id=? ORDER BY event_ms",new String[]{id})){
+            while(c.moveToNext())rows.add(new String[]{"TOOL_CHANGE",fmt(c.getLong(0)),id,base,"","",c.getString(2),String.valueOf(c.getLong(3)),"Old="+c.getString(1)+"; Reason="+c.getString(4),"",""});
         }
         return rows;
     }

@@ -1,8 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.CheckTagRS" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="Theme.MTS" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/mts_navy</item>
+        <item name="colorPrimaryVariant">@color/mts_navy</item>
+        <item name="colorSecondary">@color/mts_green</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#155EEF</item>
-        <item name="android:navigationBarColor">#101828</item>
-        <item name="android:statusBarColor">#101828</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/mts_navy</item>
+        <item name="android:windowBackground">@color/mts_background</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:colorAccent">@color/mts_blue</item>
+        <item name="materialButtonStyle">@style/Widget.MTS.Button</item>
+    </style>
+
+    <style name="Widget.MTS.Button" parent="Widget.MaterialComponents.Button">
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 </resources>
