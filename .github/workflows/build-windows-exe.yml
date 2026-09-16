@@ -1,0 +1,40 @@
+name: Build MTS Result Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        run: pip install -r pc_receiver/requirements.txt
+
+      - name: Build receiver EXE
+        run: pyinstaller --noconfirm --clean --onefile --name MTS_Result_Receiver --add-data "pc_receiver/dashboard.html;." pc_receiver/server.py
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package
+          Copy-Item dist/MTS_Result_Receiver.exe package/
+          Copy-Item pc_receiver/start_receiver.bat package/
+          Copy-Item README_TH.md package/
+          Copy-Item sample_data/Exam_Plan.xlsx package/
+
+      - name: Upload Windows program
+        uses: actions/upload-artifact@v4
+        with:
+          name: MTS-Result-PC-v2.0.0
+          path: package/
