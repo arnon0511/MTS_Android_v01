@@ -1,74 +1,106 @@
-# MTS Android v1.1.2 — Close Shift Scroll Fix
+# MTS Result System v2.0.0
 
-## แก้ไขใน v1.1.2
+ระบบรวม MTS หน้างานกับ Result Plan & Actual สำหรับ TSKForging
 
-- หน้า Close Shift เลื่อนขึ้น-ลงได้ทั้งฟอร์ม
-- ช่องพัก OT 20 นาทีแสดงครบและเลือก พัก/ไม่ได้พัก ได้
-- เพิ่มความสูงช่องเลือกและระยะขอบล่าง ป้องกันข้อความเกินกรอบ
-- เมื่อยังไม่ตอบ OT Break ระบบเลื่อนไปยังช่องที่ต้องตอบอัตโนมัติ
+## ชุดระบบ
 
-## เพิ่มใน v1.1.1
+- Android สำหรับ KEYENCE BT-A2000 (Android 14)
+- โปรแกรมรับข้อมูลบนคอม `PCN-056` (`192.168.18.145`)
+- Dashboard สำหรับหัวหน้าผ่านเว็บภายในบริษัท
+- ฐานข้อมูลและรายงานใน `\\192.168.16.211\Data\Production4\MTS_Result`
 
-- เพิ่มข้อความภาษาไทย–อังกฤษครบทุกหน้าหลัก ปุ่ม Dialog, Toast และหน้าสแกน
-- เพิ่มภาษาไทยใน Production Auto, Tag History, Shift Summary, Tool Life, Management และ Logic Test
-- เพิ่มรายการสาเหตุเริ่มต้นแบบไทย–อังกฤษ โดยคงข้อมูลและ Logic เดิม
-- แสดงกะกลางวัน/กลางคืนเป็นภาษาไทย โดยยังบันทึกค่า DAY/NIGHT เหมือนเดิม
+## กลุ่มเครื่องจักรและจุดงาน
 
-## เพิ่มใน v1.1.0
+- Cutting 1: SC12, SC16, SC25, SC26, SC27, SC28
+- Cutting 2: SC13, SC15, SC17, SC18, SC19, SC20, SC21, SC22, SC23, SC24
+- Chamfer Slugnut 3MC: CH5, CH6, CH8
+- Chamfer / Hand Chamfer: CH10, CH11, CH2, CH4, CH7, HAND_CHAMFER
+- Bending: BENDING
+- Other: SCREENING, CHECK_RUN_OUT, REPAIR
 
-- Close Shift แสดงป้ายถาวรเหนือช่อง Last Lot OK, Last Lot NG และ NG Reason
-- เลือก NO OT แล้วบันทึกเหตุการณ์โดยไม่เริ่ม Stop Timer, OT = 0 และไม่บังคับตอบ OT Break
-- Change Blade ต้องเลือก Reason และ Scan QR Blade ใหม่ก่อน Reset Tool Life
-- เก็บ Tool Change History: เครื่อง, Blade เก่า/ใหม่, Life เดิม, ผู้ปฏิบัติงาน, เวลา และ Reason
-- เพิ่มข้อความไทย–อังกฤษใน Flow หลัก
-- เพิ่ม Material Verification แบบ 3 Step: Order Sheet → Green Tag → Yellow Material Tag
-- Green ↔ Yellow ไม่เปรียบเทียบ Lot No. และ Order No.
+Other ไม่มีรหัสเครื่อง ผู้ใช้เลือกจุดงานแล้วสแกน Tag เพื่อบันทึก Part No., Item, Lot และ Qty
 
-รุ่นทดสอบรวมระบบ Manufacturing Traceability สำหรับ Galaxy S25 Ultra ใช้งาน Offline และเก็บข้อมูลในเครื่อง
+## Flow Android
 
-## ฟังก์ชันหลัก
+1. สแกน QR พนักงาน
+2. เลือกกลุ่มและเครื่องจักร/จุดงานจากหน้าแรก
+3. เริ่มผลิต หยุด ตั้งงาน บันทึก NG หรือสแกน WIP/FG Tag
+4. เครื่องหลายเครื่องเปิดงานพร้อมกันได้
+5. ข้อมูลทุกเหตุการณ์เก็บ Offline ในเครื่องก่อน
+6. ระบบส่งข้อมูลอัตโนมัติไป `http://192.168.18.145:8765`
+7. ปิดกะแยกรายเครื่อง พร้อม Last Lot, Coffee, Meal และ OT Break
 
-- Start Shift ด้วย Employee และ Machine QR
-- Management ตั้งเวลา DAY/NIGHT, ช่วงยอมรับ Start/Close, Break และ Reasons ได้โดยไม่แก้ Firmware
-- Start นอกช่วงเวลาที่กำหนดต้องเลือก Reason; Start ในช่วงกำหนดปรับเป็นเวลามาตรฐาน
-- Production Auto แสดง OK, NG, Working Time และ Stop Time แบบ Real Time
-- Timer และสถานะ Shift/Stop กลับมาทำงานต่อหลังเปิดแอปใหม่
-- Scan WIP/FG Tag และตรวจ Duplicate ด้วย `Process + Item + Lot`
-- Tag Item/Lot เดิมแต่ Process ต่างกันไม่ถือว่าซ้ำ
-- Carryover: `This Shift Qty = Original Tag Qty - Previous Shift Qty` โดยหน้า Confirm/History ยังคงแสดงข้อมูลดิบ
-- Add NG ทุก Item พร้อม Reason
-- Stop M/C พร้อม Reason และ END STOP
-- Close Shift ใส่ Last Lot OK/NG พร้อม NG Reason
-- Close Shift ก่อนมาตรฐานเกินช่วงกำหนดต้องเลือก Reason
-- บังคับตอบ Coffee Break, Meal Break และ OT Break ก่อนปิดกะ
-- Machine Shift Summary แสดง OK, NG, Working, Stop, OT และ Break
-- Tool Life สะสมจากยอด OK และ Reset เมื่อ Install Tool
-- Tag History เฉพาะรายการ Confirm, ดู RAW QR, Export CSV และ Clear History พร้อม Confirm
-- Auto Export Excel `.xlsx` เมื่อ Close Shift
-- Excel มี 3 Sheet: Shift Summary, Tag History และ Events
+ระบบใช้เวลากะและช่วงยอมรับจาก MTS เดิม หากเริ่มนอกช่วงต้องเลือกสาเหตุ หากปิดก่อนเวลา
+ต้องเลือกสาเหตุ และต้องตอบ Coffee, Meal, OT Break ให้ครบก่อนปิดกะ
 
-## Build ด้วย GitHub Actions
+กฎ Tag เดิมยังใช้ต่อ ได้แก่ WIP/FG Parser, Duplicate = Process + Item + Lot ภายในเครื่อง/กะ,
+Carryover, บันทึก RAW QR หลังยืนยัน และปฏิเสธ Tag ที่ไม่รองรับ
 
-1. Upload ทุกไฟล์ในโฟลเดอร์นี้ให้เห็น `app`, `.github`, `build.gradle`, `settings.gradle`
-2. ตรวจว่า `ProductionStore.java` ไม่มีคำว่า `Summary extends Totals`
-3. เปิด Actions → Build MTS Android APK → Run workflow
-4. ดาวน์โหลด Artifact `MTS-Android-v1.1.2-close-shift-scroll-fix`
-5. แตก ZIP และติดตั้ง `app-debug.apk`
+## สีสถานะ
 
-## ลำดับทดสอบ
+- เขียว: กำลังผลิต
+- น้ำเงิน: ตั้งงาน/เปลี่ยนงาน
+- เหลือง: หยุดตามแผน
+- แดง: หยุดผิดปกติ
+- เทา: ยังไม่รายงานหรือปิดกะแล้ว
 
-1. Management Settings → ตรวจ/แก้เวลาและ Reasons → Save
-2. เลือกกะ → Scan Employee → Scan Machine → Start Shift
-3. Scan Production Tag → ตรวจ Original/Previous/This Shift → Confirm
-4. ทดสอบ Cancel และ Duplicate
-5. Add NG → เลือก Reason
-6. Stop M/C → ออกจากหน้า → ตรวจว่าเวลายังเดิน → END STOP
-7. Tool Life → Install Tool → Scan Tag → ตรวจยอด Life
-8. Close Shift → ใส่ Last Lot → ตอบ Break ทั้ง 3 ช่อง → Confirm
-9. ตรวจ Machine Shift Summary และไฟล์ `Downloads/MTS_Exports/MTS_Shift_*.xlsx`
+## หัวหน้าผู้ยืนยัน
 
-## หมายเหตุ
+- Wichan
+- Somchai
+- Supat
+- Nittaya
 
-- รุ่นนี้คำนวณ OT จากเวลาปิดที่เกินเวลาทำงานมาตรฐาน 9 ชั่วโมง
-- ข้อมูลจัดเก็บใน SQLite/SharedPreferences ของโทรศัพท์
-- การ Clear Tag History ไม่ลบ Shift Summary และ Events
+Dashboard ใช้ข้อมูล Plan/Actual สำหรับ Result เฉพาะวันที่และกะที่หัวหน้ายืนยันแล้ว
+พร้อมประเมินรายวัน เปอร์เซ็นต์เทียบแผนถึงปัจจุบัน และสรุปเวลาสูญเสียแยกตามสาเหตุ/รายละเอียด
+
+## ติดตั้งโปรแกรม PC
+
+1. ดาวน์โหลด Artifact `MTS-Result-PC-v2.0.0` จาก GitHub Actions
+2. แตกไฟล์ไว้ในคอม PCN-056
+3. เปิด `start_receiver.bat`
+4. อนุญาต Windows Firewall สำหรับ Private/Domain network เมื่อ Windows ถาม
+5. เปิด Dashboard จากคอมในบริษัทที่ `http://192.168.18.145:8765`
+
+Folder กลางจะถูกสร้างอัตโนมัติ:
+
+```text
+MTS_Result
+├─ Database
+├─ Import
+│  ├─ Plan
+│  └─ Result
+├─ Export
+│  ├─ Daily
+│  └─ Monthly
+├─ Backup
+└─ Logs
+```
+
+ให้นำไฟล์ Plan รูปแบบ `Exam_Plan.xlsx` ไปวางใน `Import\Plan` แล้วกด `อ่าน Plan ล่าสุด`
+บน Dashboard
+
+## Build Android APK
+
+1. Upload Source ทั้งชุดขึ้น GitHub โดยให้เห็น `app`, `.github`, `pc_receiver`, `build.gradle`
+2. เปิด Actions
+3. Run `Build MTS Result Android APK`
+4. ดาวน์โหลด Artifact `MTS-Result-Android-v2.0.0`
+5. ติดตั้ง `app-debug.apk` ใน BT-A2000
+
+APK ต้องใช้ Android 11 ขึ้นไป และตั้งต้นให้รับข้อมูลจากปุ่มสแกนแบบ Keyboard Wedge ของ KEYENCE
+
+## Build Windows EXE
+
+1. เปิด Actions
+2. Run `Build MTS Result Windows EXE`
+3. ดาวน์โหลด Artifact `MTS-Result-PC-v2.0.0`
+
+## หมายเหตุเรื่อง Plan Group ของ Cutting
+
+ค่าเริ่มต้นจัด SC21–SC24 เป็น `Cut Rack Bar` และเครื่อง Cutting ที่เหลือเป็น `Cut Slug Part`
+สามารถแก้ mapping ใน `MachineCatalog.java` หากการจัดกลุ่มจริงต่างจากนี้
+
+## การสำรองข้อมูล
+
+ไฟล์ฐานข้อมูลหลักอยู่ที่ `Database\mts_result.db` ไม่ควรเปิดหรือแก้ด้วย Excel โดยตรง

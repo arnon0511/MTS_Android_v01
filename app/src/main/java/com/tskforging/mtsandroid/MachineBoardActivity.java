@@ -1,0 +1,104 @@
+package com.tskforging.mtsandroid;
+
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.GridLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+public final class MachineBoardActivity extends AppCompatActivity {
+    private enum ScanMode { EMPLOYEE, TAG, BLADE }
+    private static final int NAVY=Color.rgb(15,45,75),BLUE=Color.rgb(27,116,187),GREEN=Color.rgb(28,145,83),RED=Color.rgb(196,54,54),ORANGE=Color.rgb(230,145,40),GRAY=Color.rgb(105,115,125);
+    private MultiMachineStore store; private SyncClient sync; private ConfigStore config; private LinearLayout body; private EditText scanBox;
+    private String employee="",selectedGroup=MachineCatalog.CUTTING_1,selectedMachine="",pendingBladeReason=""; private ScanMode scanMode=ScanMode.EMPLOYEE;
+    private final ActivityResultLauncher<ScanOptions> camera=registerForActivityResult(new ScanContract(),r->{if(r.getContents()!=null)handleScan(r.getContents());});
+
+    @Override protected void onCreate(Bundle b){super.onCreate(b);getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);store=new MultiMachineStore(this);sync=new SyncClient(this,store);config=new ConfigStore(this);employee=getPreferences(MODE_PRIVATE).getString("employee","");showBoard();}
+
+    private void makeScreen(String title){ScrollView scroll=new ScrollView(this);body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(12),dp(12),dp(12),dp(28));scroll.addView(body);setContentView(scroll);TextView t=text(title,24,NAVY,true);body.addView(t);scanBox=new EditText(this);scanBox.setSingleLine(true);scanBox.setTextSize(13);scanBox.setShowSoftInputOnFocus(false);scanBox.setHint("กดปุ่ม SCAN ที่ตัวเครื่อง / Hardware scan input");scanBox.setImeOptions(EditorInfo.IME_ACTION_DONE);scanBox.setOnEditorActionListener((v,a,e)->{if(a==EditorInfo.IME_ACTION_DONE||(e!=null&&e.getKeyCode()==KeyEvent.KEYCODE_ENTER)){consumeScan();return true;}return false;});scanBox.setOnKeyListener((v,k,e)->{if(k==KeyEvent.KEYCODE_ENTER&&e.getAction()==KeyEvent.ACTION_UP){consumeScan();return true;}return false;});body.addView(scanBox,new LinearLayout.LayoutParams(-1,dp(48)));scanBox.requestFocus();}
+
+    private void showBoard(){makeScreen("MTS – สถานะเครื่องจักรทั้งหมด");LinearLayout head=row();TextView emp=text(employee.isEmpty()?"ยังไม่สแกนพนักงาน":"พนักงาน: "+employee,17,employee.isEmpty()?RED:NAVY,true);head.addView(emp,new LinearLayout.LayoutParams(0,-2,1));Button empBtn=small("สแกนพนักงาน",BLUE);empBtn.setOnClickListener(v->prepareScan(ScanMode.EMPLOYEE));head.addView(empBtn);body.addView(head);
+        Spinner group=new Spinner(this);ArrayAdapter<String>a=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,MachineCatalog.groups());group.setAdapter(a);group.setSelection(Math.max(0,MachineCatalog.groups().indexOf(selectedGroup)));group.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?>p){}public void onItemSelected(android.widget.AdapterView<?>p,View v,int pos,long id){String g=MachineCatalog.groups().get(pos);if(!g.equals(selectedGroup)){selectedGroup=g;showBoard();}}});body.addView(group,new LinearLayout.LayoutParams(-1,dp(54)));
+        TextView note=text("สีเขียว=ผลิต  น้ำเงิน=ตั้งงาน  เหลือง=หยุดตามแผน  แดง=หยุดผิดปกติ  เทา=ยังไม่รายงาน",13,Color.DKGRAY,false);body.addView(note);
+        GridLayout grid=new GridLayout(this);grid.setColumnCount(2);List<MultiMachineStore.MachineState> states=store.states(selectedGroup);for(MultiMachineStore.MachineState s:states){Button b=machineButton(s);GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=dp(88);lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);lp.setMargins(dp(4),dp(5),dp(4),dp(5));grid.addView(b,lp);}body.addView(grid);
+        Button syncBtn=action("ส่งข้อมูลตอนนี้ • ค้างส่ง "+store.pendingCount()+" รายการ",BLUE);syncBtn.setOnClickListener(v->syncNow());body.addView(syncBtn);Button config=outline("ตั้งค่า IP คอม: "+sync.serverUrl());config.setOnClickListener(v->serverDialog());body.addView(config);Button material=outline("ตรวจ Order / Tag เขียว / Tag เหลือง");material.setOnClickListener(v->startActivity(new Intent(this,MaterialVerificationActivity.class)));body.addView(material);prepareScan(employee.isEmpty()?ScanMode.EMPLOYEE:ScanMode.TAG);
+    }
+
+    private Button machineButton(MultiMachineStore.MachineState s){String line=s.machineId+"\n"+statusThai(s.status);if(!s.item.isEmpty())line+=" • "+s.item;if(!s.reason.isEmpty())line+="\n"+s.reason;Button b=new Button(this);b.setText(line);b.setTextSize(15);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setGravity(Gravity.CENTER);b.setBackgroundColor(statusColor(s.status));b.setOnClickListener(v->{selectedMachine=s.machineId;showMachine();});return b;}
+
+    private void showMachine(){MultiMachineStore.MachineState s=store.state(selectedMachine);MachineCatalog.Machine mc=MachineCatalog.find(selectedMachine);makeScreen(s.machineId+" • "+s.groupName);body.addView(text("พนักงาน: "+(employee.isEmpty()?"ยังไม่สแกน":employee)+"    กะ: "+currentShift(),16,NAVY,true));body.addView(statusCard("สถานะ",statusThai(s.status)+(s.reason.isEmpty()?"":" • "+s.reason)));body.addView(statusCard("งานปัจจุบัน",s.item.isEmpty()?"ยังไม่มี Tag":s.item+" / "+s.partNo+" / Lot "+s.lot));body.addView(statusCard("ยอด",String.format(Locale.US,"OK %,d   NG %,d   Stop %s",s.ok,s.ng,duration(s.stopSec))));
+        Button start=action("เริ่ม/กลับมาผลิต",GREEN);start.setOnClickListener(v->startMachine());body.addView(start);Button tag=action("สแกน WIP/FG Tag",BLUE);tag.setOnClickListener(v->prepareScan(ScanMode.TAG));body.addView(tag);LinearLayout r=row();Button setup=small("ตั้งงาน",BLUE);setup.setOnClickListener(v->stopDialog(true));r.addView(setup,new LinearLayout.LayoutParams(0,dp(54),1));Button stop=small("หยุดเครื่อง",RED);stop.setOnClickListener(v->stopDialog(false));r.addView(stop,new LinearLayout.LayoutParams(0,dp(54),1));body.addView(r);Button ng=outline("บันทึก NG");ng.setOnClickListener(v->ngDialog());body.addView(ng);
+        if(mc!=null&&mc.bladeEnabled){Button blade=outline("เปลี่ยนใบเลื่อย • ใบปัจจุบัน: "+(s.bladeId.isEmpty()?"-":s.bladeId));blade.setOnClickListener(v->bladeReasonDialog());body.addView(blade);}Button close=action("ปิดกะเครื่องนี้",RED);close.setOnClickListener(v->closeDialog());body.addView(close);Button back=outline("กลับหน้าเครื่องจักรทั้งหมด");back.setOnClickListener(v->showBoard());body.addView(back);prepareScan(ScanMode.TAG);
+    }
+
+    private void stopDialog(boolean setup){String[] reasons=setup?new String[]{"เปลี่ยนงาน / Change Item","ตั้งเครื่อง / SET-UP","เปลี่ยนใบเลื่อย / Change Blade"}:new String[]{"ไม่มีแผน / NO PLAN","ไม่มี OT / NO OT","ทำ 5ส / 5S","รอวัตถุดิบ / WAIT RAW MATERIAL","ฝึกอบรม / Training","ไม่มีพนักงาน / No Worker","เครื่องจักรขัดข้อง / Machine Trouble","ซ่อมบำรุง / Maintenance","อื่น ๆ / Other"};Spinner sp=new Spinner(this);sp.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,reasons));EditText detail=input("รายละเอียดเพิ่มเติม (บังคับ)",false);LinearLayout box=dialogBox();box.addView(sp);box.addView(detail);AlertDialog d=new AlertDialog.Builder(this).setTitle(setup?"ตั้งงาน/กิจกรรมผลิต":"สาเหตุเครื่องไม่ทำงาน").setView(box).setNegativeButton("ยกเลิก",null).setPositiveButton("บันทึก",null).create();d.setOnShowListener(x->d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String de=detail.getText().toString().trim();if(de.isEmpty()){detail.setError("กรุณาใส่รายละเอียด");return;}String reason=String.valueOf(sp.getSelectedItem());String st=setup?MultiMachineStore.SETUP:isPlanned(reason)?MultiMachineStore.PLANNED_STOP:MultiMachineStore.UNPLANNED_STOP;status(st,reason,de);d.dismiss();}));d.show();}
+
+    private void ngDialog(){EditText qty=input("จำนวน NG",true),detail=input("รายละเอียด",false);String[] rs={"Burr","Dent/Scratch","Dimension","Setting","Mat.Defect","Weight","Run-Out","Perpendicularity","Other"};Spinner reason=new Spinner(this);reason.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,rs));LinearLayout box=dialogBox();box.addView(qty);box.addView(reason);box.addView(detail);new AlertDialog.Builder(this).setTitle("บันทึก NG").setView(box).setNegativeButton("ยกเลิก",null).setPositiveButton("บันทึก",(d,w)->{try{store.addNg(selectedMachine,num(qty),String.valueOf(reason.getSelectedItem()),detail.getText().toString(),employee,currentShift(),System.currentTimeMillis());afterEvent("บันทึก NG แล้ว");}catch(Exception e){toast(e.getMessage());}}).show();}
+
+    private void bladeReasonDialog(){String[] rs={"ครบอายุ Tool / Tool Life Limit","แตกหัก / Broken","บิ่น / Chipped","คุณภาพผิดปกติ / Abnormal Quality","อื่น ๆ / Other"};Spinner sp=new Spinner(this);sp.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,rs));new AlertDialog.Builder(this).setTitle("เหตุผลเปลี่ยนใบเลื่อย").setView(sp).setNegativeButton("ยกเลิก",null).setPositiveButton("สแกนใบใหม่",(d,w)->{pendingBladeReason=String.valueOf(sp.getSelectedItem());prepareScan(ScanMode.BLADE);}).show();}
+
+    private void closeDialog(){EditText ok=input("Last Lot OK",true),ng=input("Last Lot NG",true),reason=input("สาเหตุ NG (เมื่อ NG > 0)",false);Spinner coffee=choice(new String[]{"เลือกจำนวนพักกาแฟ","0 ครั้ง","1 ครั้ง","2 ครั้ง"});Spinner meal=choice(new String[]{"เลือกการพักอาหาร","ไม่ได้พัก","พัก"});Spinner ot=choice(new String[]{"เลือกการพัก OT","ไม่ได้พัก","พัก"});LinearLayout box=dialogBox();box.addView(ok);box.addView(ng);box.addView(reason);box.addView(coffee);box.addView(meal);box.addView(ot);AlertDialog d=new AlertDialog.Builder(this).setTitle("ปิดกะ "+selectedMachine).setView(box).setNegativeButton("ยกเลิก",null).setPositiveButton("ยืนยันปิดกะ",null).create();d.setOnShowListener(x->d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{if(coffee.getSelectedItemPosition()==0||meal.getSelectedItemPosition()==0||ot.getSelectedItemPosition()==0){toast("กรุณาตอบข้อมูลการพักให้ครบ");return;}long actual=System.currentTimeMillis(),scheduled=scheduledTime(currentShift(),false,actual),effective=actual;boolean early=actual<scheduled-config.closeEarlyTolerance()*60000L;if(!early&&Math.abs(actual-scheduled)<=config.closeEarlyTolerance()*60000L)effective=scheduled;final long eff=effective;int coffeeCount=coffee.getSelectedItemPosition()-1;boolean mealTaken=meal.getSelectedItemPosition()==2,otTaken=ot.getSelectedItemPosition()==2;if(early){d.dismiss();closeReasonDialog(ok,ng,reason,coffeeCount,mealTaken,otTaken,actual,eff);return;}finishClose(ok,ng,reason,coffeeCount,mealTaken,otTaken,actual,eff,"");d.dismiss();}));d.show();}
+
+    private void closeReasonDialog(EditText ok,EditText ng,EditText ngReason,int coffee,boolean meal,boolean ot,long actual,long effective){Spinner reason=choice(config.closeReasons());new AlertDialog.Builder(this).setTitle("ปิดก่อนเวลา ต้องระบุสาเหตุ").setView(reason).setNegativeButton("ยกเลิก",null).setPositiveButton("ยืนยัน",(d,w)->finishClose(ok,ng,ngReason,coffee,meal,ot,actual,effective,String.valueOf(reason.getSelectedItem()))).show();}
+    private void finishClose(EditText ok,EditText ng,EditText reason,int coffee,boolean meal,boolean ot,long actual,long effective,String closeReason){try{store.closeMachine(selectedMachine,num(ok),num(ng),reason.getText().toString(),coffee,meal,ot,employee,currentShift(),actual,effective,closeReason,config.coffeeMinutes(),config.mealMinutes(),config.otBreakMinutes());afterEvent("ปิดกะแล้ว");}catch(Exception e){toast(e.getMessage());}}
+
+    private void startMachine(){if(!requireEmployee())return;MultiMachineStore.MachineState s=store.state(selectedMachine);String shift=currentShift();boolean newShift=MultiMachineStore.UNKNOWN.equals(s.status)||MultiMachineStore.CLOSED.equals(s.status)||!shift.equals(s.shiftName);long actual=System.currentTimeMillis(),scheduled=scheduledTime(shift,true,actual);if(newShift&&Math.abs(actual-scheduled)>config.startTolerance()*60000L){Spinner reason=choice(config.startReasons());new AlertDialog.Builder(this).setTitle("เริ่มนอกเวลามาตรฐาน").setView(reason).setNegativeButton("ยกเลิก",null).setPositiveButton("เริ่มกะ",(d,w)->startNow(actual,actual,String.valueOf(reason.getSelectedItem()))).show();}else startNow(actual,newShift?scheduled:actual,"");}
+    private void startNow(long actual,long effective,String reason){try{store.setStatus(selectedMachine,MultiMachineStore.RUNNING,reason,"",employee,currentShift(),actual,effective);afterEvent("เริ่มผลิตแล้ว");}catch(Exception e){toast(e.getMessage());}}
+
+    private void status(String st,String reason,String detail){if(!requireEmployee())return;try{store.setStatus(selectedMachine,st,reason,detail,employee,currentShift(),System.currentTimeMillis());afterEvent("บันทึกสถานะแล้ว");}catch(Exception e){toast(e.getMessage());}}
+    private void prepareScan(ScanMode mode){scanMode=mode;if(scanBox!=null){scanBox.setText("");scanBox.setHint(mode==ScanMode.EMPLOYEE?"สแกน QR พนักงาน":mode==ScanMode.BLADE?"สแกน QR ใบเลื่อยใหม่":"สแกน WIP/FG Tag");scanBox.requestFocus();}}
+    private void consumeScan(){String raw=scanBox.getText().toString().trim();scanBox.setText("");if(!raw.isEmpty())handleScan(raw);}
+    private void handleScan(String raw){try{if(scanMode==ScanMode.EMPLOYEE){employee=identity(raw,"EMP");getPreferences(MODE_PRIVATE).edit().putString("employee",employee).apply();toast("พนักงาน: "+employee);showBoard();return;}if(selectedMachine.isEmpty()){toast("กรุณาเลือกเครื่องหรือจุดงานก่อน");showBoard();return;}if(!requireEmployee())return;if(scanMode==ScanMode.BLADE){store.changeBlade(selectedMachine,identity(raw,"BLADE"),pendingBladeReason,employee,currentShift(),System.currentTimeMillis());pendingBladeReason="";afterEvent("ลงใบเลื่อยใหม่แล้ว");return;}TagParser.ResultTag tag=TagParser.parse(raw);MultiMachineStore.TagResult r=store.recordTag(selectedMachine,employee,currentShift(),tag,System.currentTimeMillis());if(!r.accepted){toast(r.message);return;}new AlertDialog.Builder(this).setTitle("ยืนยัน Tag แล้ว").setMessage("Tag Qty: "+r.tagQty+"\nPrevious: "+r.previousQty+"\nThis Shift: "+r.thisShiftQty).setPositiveButton("OK",(d,w)->showMachine()).show();syncNow();}catch(Exception e){toast(e.getMessage());}}
+    private void cameraScan(){ScanOptions o=new ScanOptions();o.setPrompt("สแกน QR");o.setBeepEnabled(true);o.setDesiredBarcodeFormats(ScanOptions.QR_CODE);o.setOrientationLocked(false);camera.launch(o);}
+    private void syncNow(){sync.flush((sent,pending,error)->{if(error.isEmpty())toast("ส่งแล้ว "+sent+" • ค้าง "+pending);else toast("เก็บ Offline • ค้าง "+pending+" • "+error);if(body!=null&&selectedMachine.isEmpty())showBoard();});}
+    private void afterEvent(String msg){toast(msg);syncNow();showMachine();}
+    private void serverDialog(){EditText e=input("http://192.168.18.145:8765",false);e.setText(sync.serverUrl());new AlertDialog.Builder(this).setTitle("ที่อยู่โปรแกรมรับข้อมูล").setView(e).setNegativeButton("ยกเลิก",null).setPositiveButton("บันทึก",(d,w)->{sync.setServerUrl(e.getText().toString());showBoard();}).show();}
+
+    private boolean requireEmployee(){if(!employee.isEmpty())return true;toast("กรุณาสแกนพนักงานก่อน");prepareScan(ScanMode.EMPLOYEE);return false;}
+    private static boolean isPlanned(String r){String u=r.toUpperCase(Locale.US);return u.contains("NO PLAN")||u.contains("NO OT")||u.contains("5S")||u.contains("TRAINING")||u.contains("MAINTENANCE");}
+    private String currentShift(){Calendar c=Calendar.getInstance();int now=c.get(Calendar.HOUR_OF_DAY)*60+c.get(Calendar.MINUTE);int day=minutes(config.dayStart()),night=minutes(config.nightStart());if(day<night)return now>=day&&now<night?"DAY":"NIGHT";return now>=day||now<night?"DAY":"NIGHT";}
+    private long scheduledTime(String shift,boolean start,long now){String hm="DAY".equals(shift)?(start?config.dayStart():config.dayClose()):(start?config.nightStart():config.nightClose());String[] p=hm.split(":");Calendar c=Calendar.getInstance();c.setTimeInMillis(now);c.set(Calendar.HOUR_OF_DAY,Integer.parseInt(p[0]));c.set(Calendar.MINUTE,Integer.parseInt(p[1]));c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);if("NIGHT".equals(shift)){if(start&&c.getTimeInMillis()-now>12*3600000L)c.add(Calendar.DAY_OF_MONTH,-1);if(!start&&now-c.getTimeInMillis()>12*3600000L)c.add(Calendar.DAY_OF_MONTH,1);}return c.getTimeInMillis();}
+    private static int minutes(String hm){try{String[] p=hm.split(":");return Integer.parseInt(p[0])*60+Integer.parseInt(p[1]);}catch(Exception e){return 0;}}
+    private static String identity(String raw,String prefix){String s=raw==null?"":raw.trim();String[] f=s.split("\\|",-1);if(f.length>1&&f[0].equalsIgnoreCase(prefix))return f[1].trim();return s;}
+    private static String statusThai(String s){if(MultiMachineStore.RUNNING.equals(s))return "กำลังผลิต";if(MultiMachineStore.SETUP.equals(s))return "ตั้งงาน";if(MultiMachineStore.PLANNED_STOP.equals(s))return "หยุดตามแผน";if(MultiMachineStore.UNPLANNED_STOP.equals(s))return "หยุดผิดปกติ";if(MultiMachineStore.CLOSED.equals(s))return "ปิดกะแล้ว";return "ยังไม่รายงาน";}
+    private static int statusColor(String s){if(MultiMachineStore.RUNNING.equals(s))return GREEN;if(MultiMachineStore.SETUP.equals(s))return BLUE;if(MultiMachineStore.PLANNED_STOP.equals(s))return ORANGE;if(MultiMachineStore.UNPLANNED_STOP.equals(s))return RED;return GRAY;}
+    private static String duration(long sec){return String.format(Locale.US,"%d:%02d",sec/3600,(sec%3600)/60);}
+    private long num(EditText e){try{return Long.parseLong(e.getText().toString().trim());}catch(Exception x){return 0;}}
+    private void toast(String s){Toast.makeText(this,s==null?"ผิดพลาด":s,Toast.LENGTH_LONG).show();}
+    private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
+    private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(dp(4),dp(6),dp(4),dp(6));if(bold)t.setTypeface(null,android.graphics.Typeface.BOLD);return t;}
+    private TextView statusCard(String title,String value){TextView t=text(title+"\n"+value,16,NAVY,true);t.setBackgroundColor(Color.rgb(235,242,248));t.setPadding(dp(12),dp(10),dp(12),dp(10));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(5),0,dp(5));t.setLayoutParams(p);return t;}
+    private Button action(String s,int color){Button b=new Button(this);b.setText(s);b.setTextSize(17);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setBackgroundColor(color);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(58));p.setMargins(0,dp(5),0,dp(5));b.setLayoutParams(p);return b;}
+    private Button outline(String s){Button b=new Button(this);b.setText(s);b.setTextSize(15);b.setAllCaps(false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(54));p.setMargins(0,dp(4),0,dp(4));b.setLayoutParams(p);return b;}
+    private Button small(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setBackgroundColor(color);b.setAllCaps(false);return b;}
+    private LinearLayout row(){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.HORIZONTAL);r.setGravity(Gravity.CENTER_VERTICAL);return r;}
+    private LinearLayout dialogBox(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(20),dp(8),dp(20),0);return l;}
+    private EditText input(String hint,boolean number){EditText e=new EditText(this);e.setHint(hint);e.setTextSize(17);if(number)e.setInputType(InputType.TYPE_CLASS_NUMBER);return e;}
+    private Spinner choice(String[] values){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,values));return s;}
+    @Override public void onBackPressed(){if(!selectedMachine.isEmpty()){selectedMachine="";showBoard();}else super.onBackPressed();}
+}

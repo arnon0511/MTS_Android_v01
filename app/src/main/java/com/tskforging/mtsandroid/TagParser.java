@@ -62,7 +62,9 @@ public final class TagParser {
     private static boolean looksLikeProcess(String value) {
         String s = normalize(value);
         return s.contains("#") || s.contains("CUTTING") || s.contains("CHAMFER")
-                || s.contains("PRESS") || s.contains("DRAWING");
+                || s.contains("PRESS") || s.contains("DRAWING") || s.contains("BENDING")
+                || s.contains("RUN-OUT") || s.contains("RUN OUT") || s.contains("RUNOUT")
+                || s.contains("SCREEN") || s.contains("REPAIR") || s.contains("CHECK");
     }
 
     private static String normalize(String value) {
