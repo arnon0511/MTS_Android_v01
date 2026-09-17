@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#17324D"/>
+  <rect x="54" y="54" width="404" height="404" rx="72" fill="#FFFFFF"/>
+  <path d="M92 245V166l62 34v-45l66 38v-60h54v91h75v-54h72v146H92z" fill="#17324D"/>
+  <path d="M105 326h302v42H105z" fill="#2E7D32"/>
+  <g fill="#FFFFFF">
+    <circle cx="145" cy="347" r="10"/><circle cx="200" cy="347" r="10"/><circle cx="255" cy="347" r="10"/><circle cx="310" cy="347" r="10"/><circle cx="365" cy="347" r="10"/>
+  </g>
+  <g fill="none" stroke="#FFFFFF" stroke-width="10">
+    <path d="M363 190h30v30M363 276h30v-30M307 190h-30v30M307 276h-30v-30"/>
+  </g>
+  <g fill="#FFFFFF">
+    <rect x="296" y="208" width="18" height="18"/><rect x="322" y="208" width="18" height="18"/><rect x="348" y="208" width="18" height="18"/>
+    <rect x="296" y="234" width="18" height="18"/><rect x="348" y="234" width="18" height="18"/><rect x="322" y="260" width="18" height="18"/><rect x="348" y="260" width="18" height="18"/>
+  </g>
+  <rect x="104" y="382" width="304" height="66" rx="18" fill="#17324D"/>
+  <text x="256" y="430" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="54" font-weight="700" letter-spacing="8" fill="#FFFFFF">MTS</text>
+</svg>

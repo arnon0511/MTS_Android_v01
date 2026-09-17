@@ -1,4 +1,4 @@
-# เช็กลิสต์ติดตั้ง MTS Result v2.0.0
+# เช็กลิสต์ติดตั้ง MTS Result v2.0.1
 
 ## 1. สร้างไฟล์ติดตั้ง
 
@@ -39,4 +39,3 @@
 - Cutting ที่เหลืออยู่กลุ่ม `Cut Slug Part`
 - `BENDING` เป็นจุดงานรวมจนกว่าจะได้รับรหัสเครื่องย่อย
 - SCREENING, CHECK_RUN_OUT และ REPAIR รวมผลเป็น `Other`
-

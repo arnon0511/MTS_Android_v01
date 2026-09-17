@@ -1,4 +1,11 @@
-# MTS Result System v2.0.0
+# MTS Result System v2.0.1
+
+## แก้ไขใน v2.0.1 (Android)
+
+- แก้ปัญหาสแกนชื่อพนักงานแล้ว แต่ปุ่มเริ่มงานยังแจ้งให้สแกนซ้ำ
+- บันทึกชื่อพนักงานทันทีและตรวจซ้ำก่อนเริ่มงานทุกครั้ง
+- เพิ่มไอคอน MTS สำหรับหน้าจอ KEYENCE/Android
+- หน้าหยุดเครื่องและตั้งงานเลือกสาเหตุ/รายละเอียดภาษาไทยได้ โดยไม่ต้องพิมพ์ภาษาไทย
 
 ระบบรวม MTS หน้างานกับ Result Plan & Actual สำหรับ TSKForging
 
@@ -85,7 +92,7 @@ MTS_Result
 1. Upload Source ทั้งชุดขึ้น GitHub โดยให้เห็น `app`, `.github`, `pc_receiver`, `build.gradle`
 2. เปิด Actions
 3. Run `Build MTS Result Android APK`
-4. ดาวน์โหลด Artifact `MTS-Result-Android-v2.0.0`
+4. ดาวน์โหลด Artifact `MTS-Result-Android-v2.0.1`
 5. ติดตั้ง `app-debug.apk` ใน BT-A2000
 
 APK ต้องใช้ Android 11 ขึ้นไป และตั้งต้นให้รับข้อมูลจากปุ่มสแกนแบบ Keyboard Wedge ของ KEYENCE
