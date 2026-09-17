@@ -87,6 +87,12 @@ public final class MultiMachineStore extends SQLiteOpenHelper {
         s.startMs=c.getLong(14);s.stopStartMs=c.getLong(15);s.stopSec=c.getLong(16);s.updatedMs=c.getLong(17); return s;
     }
 
+    public void assignEmployee(String machineId,String employee,String shift,long now)throws Exception{
+        MachineState s=state(machineId);if(s.machineId.isEmpty())throw new IllegalArgumentException("ไม่พบเครื่องจักร / Unknown machine");
+        ContentValues v=new ContentValues();v.put("employee",clean(employee));v.put("updated_ms",now);getWritableDatabase().update("machine_state",v,"machine_id=?",new String[]{machineId});
+        JSONObject p=new JSONObject();p.put("employee",clean(employee));p.put("assigned_shift",clean(shift));addEvent("EMPLOYEE",machineId,employee,shift,now,p);
+    }
+
     public void setStatus(String machineId, String status, String reason, String detail,
                           String employee, String shift, long now) throws Exception {
         setStatus(machineId,status,reason,detail,employee,shift,now,now);
@@ -98,12 +104,11 @@ public final class MultiMachineStore extends SQLiteOpenHelper {
         if (old.machineId.isEmpty()) throw new IllegalArgumentException("ไม่พบเครื่องจักร / Unknown machine");
         long stopSec = old.stopSec;
         long stopStart = old.stopStartMs;
-        if ((PLANNED_STOP.equals(old.status) || UNPLANNED_STOP.equals(old.status)) && stopStart > 0 &&
-                !(PLANNED_STOP.equals(status) || UNPLANNED_STOP.equals(status))) {
+        if (isStopped(old.status) && stopStart > 0 && !isStopped(status)) {
             stopSec += Math.max(0, (actualMs-stopStart)/1000); stopStart=0;
         }
-        if ((PLANNED_STOP.equals(status) || UNPLANNED_STOP.equals(status)) && stopStart == 0) stopStart=actualMs;
-        boolean newShift = RUNNING.equals(status) && (CLOSED.equals(old.status) || !clean(shift).equals(old.shiftName));
+        if (isStopped(status) && stopStart == 0) stopStart=actualMs;
+        boolean newShift = RUNNING.equals(status) && (old.startMs==0 || CLOSED.equals(old.status) || !clean(shift).equals(old.shiftName));
         ContentValues v = new ContentValues();
         v.put("status",status);v.put("reason",clean(reason));v.put("detail",clean(detail));v.put("employee",clean(employee));v.put("shift_name",clean(shift));
         v.put("updated_ms",actualMs);v.put("stop_start_ms",stopStart);v.put("stop_sec",stopSec);
@@ -165,6 +170,7 @@ public final class MultiMachineStore extends SQLiteOpenHelper {
     private void addEvent(SQLiteDatabase db,String type,String machineId,String employee,String shift,long now,JSONObject payload)throws Exception{MachineState s=state(machineId);ContentValues v=new ContentValues();v.put("event_id",UUID.randomUUID().toString());v.put("event_type",type);v.put("machine_id",machineId);v.put("group_name",s.groupName);v.put("plan_group",s.planGroup);v.put("employee",clean(employee));v.put("shift_name",clean(shift));v.put("event_ms",now);v.put("payload_json",payload.toString());v.put("synced",0);db.insertOrThrow("events",null,v);}
     private long sum(String sql,String[] args){try(Cursor c=getReadableDatabase().rawQuery(sql,args)){return c.moveToFirst()?c.getLong(0):0;}}
     private static long number(String text){try{return Math.round(Double.parseDouble(clean(text).replace(",","")));}catch(Exception e){return 0;}}
+    private static boolean isStopped(String status){return SETUP.equals(status)||PLANNED_STOP.equals(status)||UNPLANNED_STOP.equals(status);}
     private static String shiftKey(String shift,long now){java.util.Calendar c=java.util.Calendar.getInstance();c.setTimeInMillis(now);if("NIGHT".equalsIgnoreCase(clean(shift))&&c.get(java.util.Calendar.HOUR_OF_DAY)<12)c.add(java.util.Calendar.DAY_OF_MONTH,-1);java.text.SimpleDateFormat f=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);return f.format(c.getTime())+"|"+shift;}
     private static String clean(String s){return s==null?"":s.trim();}
 }
