@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 DEFAULT_ROOT = r"\\192.168.16.211\Data\Production4\MTS_Result"
 SUPERVISORS = {"wichan", "somchai", "supat", "nittaya"}
 PLAN_GROUPS = [
@@ -25,7 +25,7 @@ PLAN_GROUPS = [
 ]
 MACHINES = {
     **{x: ("Cutting 1", "Cut Rack Bar" if x in {"SC21","SC22","SC23","SC24"} else "Cut Slug Part") for x in ["SC12","SC16","SC25","SC26","SC27","SC28"]},
-    **{x: ("Cutting 2", "Cut Rack Bar" if x in {"SC21","SC22","SC23","SC24"} else "Cut Slug Part") for x in ["SC13","SC15","SC17","SC18","SC19","SC20","SC21","SC22","SC23","SC24"]},
+    **{x: ("Cutting 2", "Cut Rack Bar" if x in {"SC21","SC22","SC23","SC24"} else "Cut Slug Part") for x in ["SC13","SC15","SC17","SC18","SC19","SC20","SC21","SC22","SC23","SC24","CP2","M069"]},
     **{x: ("Chamfer Slugnut 3MC", "Chamfer Slugnut") for x in ["CH5","CH6","CH8"]},
     **{x: ("Chamfer / Hand Chamfer", "Chamfer") for x in ["CH10","CH11","CH2","CH4","CH7"]},
     "HAND_CHAMFER": ("Chamfer / Hand Chamfer", "Hand Chamfer"),
@@ -90,6 +90,10 @@ class Database:
                 CREATE TABLE IF NOT EXISTS plan_month(
                   month_key TEXT,group_name TEXT,plan_qty REAL,plan_hours REAL,workdays INTEGER,
                   source_file TEXT,imported_ms INTEGER,PRIMARY KEY(month_key,group_name));
+                CREATE TABLE IF NOT EXISTS shift_attendance(
+                  production_date TEXT,shift_name TEXT,total INTEGER,sick INTEGER,personal INTEGER,
+                  vacation INTEGER,outside INTEGER,outside_reason TEXT,available INTEGER,updated_ms INTEGER,
+                  PRIMARY KEY(production_date,shift_name));
                 """
             )
             for machine, (group, plan_group) in MACHINES.items():
@@ -123,6 +127,18 @@ class Database:
             return True
 
     def _update_status(self, c, e: dict, p: dict, pdate: str):
+        if str(e["event_type"]) == "ATTENDANCE":
+            c.execute(
+                """INSERT OR REPLACE INTO shift_attendance
+                   (production_date,shift_name,total,sick,personal,vacation,outside,outside_reason,available,updated_ms)
+                   VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (pdate, str(e.get("shift_name") or ""), int(p.get("total", 0) or 0),
+                 int(p.get("sick", 0) or 0), int(p.get("personal", 0) or 0),
+                 int(p.get("vacation", 0) or 0), int(p.get("outside", 0) or 0),
+                 str(p.get("outside_reason") or ""), int(p.get("available", 0) or 0),
+                 int(e["event_ms"])),
+            )
+            return
         machine = str(e["machine_id"])
         old = c.execute("SELECT * FROM machine_status WHERE machine_id=?", (machine,)).fetchone()
         row = dict(old) if old else {
@@ -328,6 +344,10 @@ class Database:
                 ev.append([r[0],r[1],r[2],r[3],r[4],r[5],r[6],datetime.fromtimestamp(r[7]/1000),r[8]])
         ap = wb.create_sheet("Approvals"); ap.append(["Production Date","Shift","Supervisor","Approved Time","Note"])
         for r in self.approval_rows(10000): ap.append([r["production_date"],r["shift_name"],r["supervisor"],datetime.fromtimestamp(r["approved_ms"]/1000),r["note"]])
+        at = wb.create_sheet("Attendance"); at.append(["Production Date","Shift","Total","Sick","Personal","Vacation","Outside","Outside Reason","Available","Updated"])
+        with self.connect() as c:
+            for r in c.execute("SELECT * FROM shift_attendance WHERE substr(production_date,1,7)=? ORDER BY production_date,shift_name", (month,)):
+                at.append([r["production_date"],r["shift_name"],r["total"],r["sick"],r["personal"],r["vacation"],r["outside"],r["outside_reason"],r["available"],datetime.fromtimestamp(r["updated_ms"]/1000)])
         st = wb.create_sheet("Machine Status"); rows=self.status_rows(); st.append(list(rows[0].keys()) if rows else ["No data"])
         for r in rows: st.append(list(r.values()))
         out = self.export_monthly / f"MTS_Result_{month}.xlsx"; wb.save(out); return out

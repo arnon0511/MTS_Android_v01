@@ -7,11 +7,12 @@ public final class TagParser {
 
     public static final class ResultTag {
         public final Type type;
-        public final String process, item, partNo, partName, qty, lot, charge, raw;
+        public final String order, process, item, partNo, partName, qty, lot, charge, raw;
 
-        ResultTag(Type type, String process, String item, String partNo, String partName,
+        ResultTag(Type type, String order, String process, String item, String partNo, String partName,
                   String qty, String lot, String charge, String raw) {
             this.type = type;
+            this.order = clean(order);
             this.process = clean(process);
             this.item = clean(item);
             this.partNo = clean(partNo);
@@ -27,7 +28,7 @@ public final class TagParser {
         }
 
         public String duplicateKey() {
-            return normalize(process) + "|" + normalize(item) + "|" + normalize(lot);
+            return normalize(order) + "|" + normalize(process) + "|" + normalize(item) + "|" + normalize(lot);
         }
     }
 
@@ -37,18 +38,18 @@ public final class TagParser {
         if (raw == null) return unknown("");
         String[] f = raw.trim().split("\\|", -1);
         if (f.length == 13 && looksLikeProcess(get(f, 1))) {
-            return new ResultTag(Type.WIP, get(f, 1), get(f, 2), get(f, 4), get(f, 5),
+            return new ResultTag(Type.WIP, get(f, 0), get(f, 1), get(f, 2), get(f, 4), get(f, 5),
                     get(f, 6), get(f, 11), get(f, 12), raw);
         }
         if (f.length == 14 && startsWith(get(f, 1), "FP")) {
-            return new ResultTag(Type.FG, "FG", get(f, 1), get(f, 3), get(f, 4),
+            return new ResultTag(Type.FG, get(f, 0), "FG", get(f, 1), get(f, 3), get(f, 4),
                     get(f, 5), get(f, 10), get(f, 11), raw);
         }
         return unknown(raw);
     }
 
     private static ResultTag unknown(String raw) {
-        return new ResultTag(Type.UNKNOWN, "", "", "", "", "", "", "", raw);
+        return new ResultTag(Type.UNKNOWN, "", "", "", "", "", "", "", "", raw);
     }
 
     private static String get(String[] f, int index) {

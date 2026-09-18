@@ -1,4 +1,16 @@
-# MTS Result System v2.0.2
+# MTS Result System v2.1.0
+
+## ปรับปรุงใน v2.1.0
+
+- เพิ่ม CP2 และ M069 ในกลุ่ม Cutting 2
+- เพิ่มเช็คพนักงานประจำกะแบบไม่บังคับ พร้อมข้อมูลลาและไปทำงานข้างนอก
+- เลือกตารางกะแยกตามเครื่อง: ไม่มี OT, OT แบบที่ 1 และขยายเป็น OT แบบที่ 2
+- รวมการตรวจเอกสารเข้ากับขั้นตอนเริ่มงาน: Cutting ใช้ Order + Tag เขียว + Tag เหลือง ส่วนกระบวนการถัดไปใช้ Order + Tag เหลือง
+- ทุกการสแกนแสดงข้อมูลให้ยืนยันก่อนบันทึก และ WIP/FG Tag ถาม NG ในหน้าต่างเดียวกัน
+- แยกยอด Tag ตาม Order + Process + Item + Lot รองรับ Item เดียวกันหลาย Order
+- ย้ายตั้งงานระหว่างผลิต, SET-UP และเปลี่ยนใบเลื่อยไว้ในเมนูหยุดเครื่อง
+- Tool Life ใบเลื่อยบันทึกเป็นจำนวนชิ้น และแสดงสรุปก่อนยืนยันใบใหม่
+- ปิดกะตัดเวลาหยุดที่ยังทำงานอยู่อัตโนมัติ พร้อมสรุป Working time และ Stop time
 
 ## ปรับปรุงใน v2.0.2 (Android)
 
@@ -29,7 +41,7 @@
 ## กลุ่มเครื่องจักรและจุดงาน
 
 - Cutting 1: SC12, SC16, SC25, SC26, SC27, SC28
-- Cutting 2: SC13, SC15, SC17, SC18, SC19, SC20, SC21, SC22, SC23, SC24
+- Cutting 2: SC13, SC15, SC17, SC18, SC19, SC20, SC21, SC22, SC23, SC24, CP2, M069
 - Chamfer Slugnut 3MC: CH5, CH6, CH8
 - Chamfer / Hand Chamfer: CH10, CH11, CH2, CH4, CH7, HAND_CHAMFER
 - Bending: BENDING
@@ -39,18 +51,20 @@ Other ไม่มีรหัสเครื่อง ผู้ใช้เล�
 
 ## Flow Android
 
-1. สแกน QR พนักงาน
-2. เลือกกลุ่มและเครื่องจักร/จุดงานจากหน้าแรก
-3. เริ่มผลิต หยุด ตั้งงาน บันทึก NG หรือสแกน WIP/FG Tag
-4. เครื่องหลายเครื่องเปิดงานพร้อมกันได้
-5. ข้อมูลทุกเหตุการณ์เก็บ Offline ในเครื่องก่อน
-6. ระบบส่งข้อมูลอัตโนมัติไป `http://192.168.18.145:8765`
-7. ปิดกะแยกรายเครื่อง พร้อม Last Lot, Coffee, Meal และ OT Break
+1. เลือกกลุ่มและเครื่องจักร/จุดงานจากหน้าแรก
+2. สแกน QR พนักงานของเครื่องนั้นและกดยืนยัน
+3. Cutting สแกน Order → Tag เขียว → Tag เหลือง; กลุ่มอื่นสแกน Order → Tag เหลือง
+4. เลือกตารางกะของเครื่อง แล้วเริ่มผลิต
+5. สแกน WIP/FG Tag ตรวจข้อมูล ยืนยันจำนวน OK และลง NG
+6. เครื่องหลายเครื่องเปิดงานพร้อมกันได้
+7. ข้อมูลทุกเหตุการณ์เก็บ Offline ในเครื่องก่อน
+8. ระบบส่งข้อมูลอัตโนมัติไป `http://192.168.18.145:8765`
+9. ปิดกะแยกรายเครื่อง พร้อม Last Lot, Coffee, Meal และ OT Break
 
 ระบบใช้เวลากะและช่วงยอมรับจาก MTS เดิม หากเริ่มนอกช่วงต้องเลือกสาเหตุ หากปิดก่อนเวลา
 ต้องเลือกสาเหตุ และต้องตอบ Coffee, Meal, OT Break ให้ครบก่อนปิดกะ
 
-กฎ Tag เดิมยังใช้ต่อ ได้แก่ WIP/FG Parser, Duplicate = Process + Item + Lot ภายในเครื่อง/กะ,
+กฎ Tag ได้แก่ WIP/FG Parser, Duplicate = Order + Process + Item + Lot ภายในเครื่อง/กะ,
 Carryover, บันทึก RAW QR หลังยืนยัน และปฏิเสธ Tag ที่ไม่รองรับ
 
 ## สีสถานะ
@@ -59,7 +73,7 @@ Carryover, บันทึก RAW QR หลังยืนยัน และป
 - น้ำเงิน: ตั้งงาน/เปลี่ยนงาน
 - เหลือง: หยุดตามแผน
 - แดง: หยุดผิดปกติ
-- เทา: ยังไม่รายงานหรือปิดกะแล้ว
+- เทา: ไม่มีแผนการผลิตหรือปิดกะแล้ว
 
 ## หัวหน้าผู้ยืนยัน
 
@@ -73,7 +87,7 @@ Dashboard ใช้ข้อมูล Plan/Actual สำหรับ Result เ�
 
 ## ติดตั้งโปรแกรม PC
 
-1. ดาวน์โหลด Artifact `MTS-Result-PC-v2.0.0` จาก GitHub Actions
+1. ดาวน์โหลด Artifact `MTS-Result-PC-v2.1.0` จาก GitHub Actions
 2. แตกไฟล์ไว้ในคอม PCN-056
 3. เปิด `start_receiver.bat`
 4. อนุญาต Windows Firewall สำหรับ Private/Domain network เมื่อ Windows ถาม
@@ -102,7 +116,7 @@ MTS_Result
 1. Upload Source ทั้งชุดขึ้น GitHub โดยให้เห็น `app`, `.github`, `pc_receiver`, `build.gradle`
 2. เปิด Actions
 3. Run `Build MTS Result Android APK`
-4. ดาวน์โหลด Artifact `MTS-Result-Android-v2.0.2`
+4. ดาวน์โหลด Artifact `MTS-Result-Android-v2.1.0`
 5. ติดตั้ง `app-debug.apk` ใน BT-A2000
 
 APK ต้องใช้ Android 11 ขึ้นไป และตั้งต้นให้รับข้อมูลจากปุ่มสแกนแบบ Keyboard Wedge ของ KEYENCE
@@ -111,7 +125,7 @@ APK ต้องใช้ Android 11 ขึ้นไป และตั้งต
 
 1. เปิด Actions
 2. Run `Build MTS Result Windows EXE`
-3. ดาวน์โหลด Artifact `MTS-Result-PC-v2.0.0`
+3. ดาวน์โหลด Artifact `MTS-Result-PC-v2.1.0`
 
 ## หมายเหตุเรื่อง Plan Group ของ Cutting
 

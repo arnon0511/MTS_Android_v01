@@ -36,7 +36,7 @@ public final class MachineCatalog {
         List<Machine> list = new ArrayList<>();
         addCutting(list, CUTTING_1, "SC12", "SC16", "SC25", "SC26", "SC27", "SC28");
         addCutting(list, CUTTING_2, "SC13", "SC15", "SC17", "SC18", "SC19", "SC20",
-                "SC21", "SC22", "SC23", "SC24");
+                "SC21", "SC22", "SC23", "SC24", "CP2", "M069");
 
         for (String id : Arrays.asList("CH5", "CH6", "CH8"))
             list.add(new Machine(id, CHAMFER_SLUGNUT, "Chamfer Slugnut", false, true));

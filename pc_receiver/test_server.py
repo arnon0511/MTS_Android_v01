@@ -69,6 +69,19 @@ class ReceiverTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.db.approve("2026-09-16", "DAY", "Unknown")
 
+    def test_attendance_does_not_create_machine(self):
+        event = self.event("attendance-1", "ATTENDANCE", {
+            "total": 20, "sick": 1, "personal": 1, "vacation": 1,
+            "outside": 2, "outside_reason": "ช่วยหน่วยงานอื่น", "available": 15,
+        })
+        event["machine_id"] = "SHIFT_ATTENDANCE"
+        event["group_name"] = event["plan_group"] = ""
+        self.assertTrue(self.db.ingest(event))
+        self.assertNotIn("SHIFT_ATTENDANCE", {x["machine_id"] for x in self.db.status_rows()})
+        with self.db.connect() as c:
+            row = c.execute("SELECT * FROM shift_attendance WHERE production_date=? AND shift_name=?", ("2026-09-16", "DAY")).fetchone()
+        self.assertEqual(row["available"], 15)
+
     def test_http_health_and_event(self):
         app = App(self.db, "127.0.0.1", 0)
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), app.handler())
